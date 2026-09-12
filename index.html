@@ -205,14 +205,25 @@
   .who-took-list li {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
     padding: 8px 0;
     border-bottom: 1px solid var(--line);
     font-size: 14px;
   }
 
+  .who-took-list li span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
   .who-took-list li span.count {
     color: var(--ink-soft);
     font-size: 12.5px;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .progress-bar {
