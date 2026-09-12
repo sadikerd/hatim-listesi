@@ -139,6 +139,13 @@
     border-color: #E0B7AC;
   }
 
+  .countdown-banner.soon {
+    color: #A6432D;
+    background: #F7E4DC;
+    border-color: #E0B7AC;
+    font-weight: 700;
+  }
+
   .help-banner {
     text-align: center;
     font-size: 12.5px;
@@ -224,6 +231,20 @@
     font-size: 12.5px;
     flex-shrink: 0;
     white-space: nowrap;
+  }
+
+  .hatim-delete-btn {
+    background: none;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 2px 4px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .hatim-delete-btn:hover {
+    opacity: 1;
   }
 
   .progress-bar {
@@ -458,6 +479,10 @@
     padding: 40px 0;
     color: var(--ink-soft);
     font-size: 13px;
+  }
+  @keyframes confettiFall {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 0.95; }
+    100% { transform: translate(var(--drift), 100vh) rotate(360deg); opacity: 0.3; }
   }
 </style>
 </head>
@@ -1111,7 +1136,7 @@ function renderCountdownNow() {
   if (days > 0) text += days + ' gün ';
   text += hours + ' saat ' + minutes + ' dk';
   countdownBanner.textContent = text;
-  countdownBanner.className = 'countdown-banner';
+  countdownBanner.className = totalMinutes <= 3 * 24 * 60 ? 'countdown-banner soon' : 'countdown-banner';
 }
 
 function openWhoTook() {
@@ -1142,6 +1167,37 @@ function openWhoTook() {
   overlay.classList.add('open');
 }
 
+function openLeaderboard() {
+  const counts = {};
+  (state.hatims || []).forEach((h) => {
+    (h.cuzler || []).forEach((entry) => {
+      if (!entry) return;
+      if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
+      counts[entry.name].total++;
+      if (entry.completed) counts[entry.name].completed++;
+    });
+  });
+  const names = Object.keys(counts).sort((a, b) => counts[b].completed - counts[a].completed || counts[b].total - counts[a].total || a.localeCompare(b));
+  let listHtml;
+  if (names.length === 0) {
+    listHtml = '<p class="sub">Henüz hiç veri yok.</p>';
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    listHtml = '<ul class="who-took-list">' +
+      names.map((n, i) => '<li><span>' + (medals[i] || (i + 1) + '.') + ' ' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
+      '</ul>';
+  }
+  modalContent.innerHTML =
+    '<h2>En Çok Katkı Sağlayanlar</h2>' +
+    '<p class="sub">Tüm hatimler boyunca, kim kaç cüz/dua okumuş.</p>' +
+    listHtml +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="leaderboardCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('leaderboardCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
 function openQrModal() {
   const url = window.location.href;
   const qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
@@ -1169,16 +1225,20 @@ function openHatimList() {
       hatims.map((h) => {
         const completed = h.cuzler.filter((e) => e && e.completed).length;
         const isSelected = h.id === selectedHatimId;
+        const deleteBtn = adminMode
+          ? '<button class="hatim-delete-btn" data-del-id="' + h.id + '" title="Bu hatimi sil">🗑️</button>'
+          : '';
         return '<li style="cursor:pointer;' + (isSelected ? ' font-weight:700;' : '') + '" data-id="' + h.id + '">' +
           '<span>' + (isSelected ? '● ' : '') + escapeHtml(h.hatimName || 'Hatim') + '</span>' +
           '<span class="count">' + completed + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.createdDate || '') + '</span>' +
+          deleteBtn +
           '</li>';
       }).join('') +
       '</ul>';
   }
   modalContent.innerHTML =
     '<h2>Hatim Listesi</h2>' +
-    '<p class="sub">Görüntülemek istediğin hatime dokun.</p>' +
+    '<p class="sub">Görüntülemek istediğin hatime dokun.' + (adminMode ? ' Silmek için 🗑️ ikonuna dokun.' : '') + '</p>' +
     listHtml +
     '<div class="modal-actions">' +
       '<button class="btn btn-primary" id="hatimListCloseBtn">Kapat</button>' +
@@ -1191,7 +1251,32 @@ function openHatimList() {
       render();
     });
   });
+  modalContent.querySelectorAll('.hatim-delete-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteHatim(btn.getAttribute('data-del-id'));
+    });
+  });
   overlay.classList.add('open');
+}
+
+function deleteHatim(id) {
+  const h = (state.hatims || []).find((x) => x.id === id);
+  if (!h) return;
+  if (state.hatims.length <= 1) {
+    showMessage('Bu son hatim — silinemez. Önce yeni bir hatim ekleyip sonra bunu silebilirsin.');
+    return;
+  }
+  showConfirm('"' + (h.hatimName || 'Bu hatim') + '" tamamen silinecek, geri alınamaz. Emin misin?', async () => {
+    await refetchIfPossible();
+    state.hatims = (state.hatims || []).filter((x) => x.id !== id);
+    if (selectedHatimId === id) {
+      selectedHatimId = state.hatims[0] ? state.hatims[0].id : null;
+    }
+    await saveState();
+    render();
+    openHatimList();
+  });
 }
 
 function getRemainingTimeCaps() {
@@ -1298,6 +1383,43 @@ async function completeTile() {
   await saveState();
   render();
   closeModal();
+  const completedCount = h.cuzler.filter((e) => e && e.completed).length;
+  if (completedCount === TOTAL && !h.celebrated) {
+    h.celebrated = true;
+    await saveState();
+    celebrateHatimComplete(h.hatimName);
+  }
+}
+
+function celebrateHatimComplete(hatimName) {
+  const colors = ['#1E4D3B', '#B08A2E', '#D9C68F', '#A6432D', '#F5EFE1'];
+  const layer = document.createElement('div');
+  layer.style.position = 'fixed';
+  layer.style.inset = '0';
+  layer.style.pointerEvents = 'none';
+  layer.style.zIndex = '9999';
+  layer.style.overflow = 'hidden';
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    const size = 6 + Math.random() * 6;
+    piece.style.position = 'absolute';
+    piece.style.top = '-20px';
+    piece.style.left = Math.random() * 100 + '%';
+    piece.style.width = size + 'px';
+    piece.style.height = size + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    piece.style.opacity = '0.9';
+    const duration = 2.2 + Math.random() * 1.6;
+    const delay = Math.random() * 0.4;
+    const drift = (Math.random() * 160 - 80) + 'px';
+    piece.style.animation = 'confettiFall ' + duration + 's ease-in ' + delay + 's forwards';
+    piece.style.setProperty('--drift', drift);
+    layer.appendChild(piece);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 4200);
+  showMessage('🎉 Tebrikler! "' + (hatimName || 'Bu hatim') + '" tamamlandı — 31/31 okundu. Emeği geçen herkese Allah razı olsun.');
 }
 
 async function toggleHelpRequest(index) {
@@ -1428,6 +1550,7 @@ function resetAll() {
     await refetchIfPossible();
     const h = getSelectedHatim();
     h.cuzler = new Array(TOTAL).fill(null);
+    h.celebrated = false;
     await saveState();
     render();
   });
@@ -1453,6 +1576,7 @@ function openMainMenu() {
     '<h2>Menü</h2>' +
     '<button class="btn ' + adminToggleClass + '" id="menuAdminToggle" style="width:100%; margin-bottom:8px;">' + adminToggleLabel + '</button>' +
     '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
+    '<button class="btn btn-ghost" id="menuLeaderboard" style="width:100%; margin-bottom:8px;">En Çok Katkı Sağlayanlar</button>' +
     '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
     '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
     '<button class="btn btn-ghost" id="menuHatimList" style="width:100%; margin-bottom:8px;">Hatim Listesi</button>' +
@@ -1465,6 +1589,7 @@ function openMainMenu() {
     if (adminMode) { disableAdminMode(); } else { openAdminModeModal(); }
   });
   document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
+  document.getElementById('menuLeaderboard').addEventListener('click', openLeaderboard);
   document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
   document.getElementById('menuQr').addEventListener('click', openQrModal);
   document.getElementById('menuHatimList').addEventListener('click', openHatimList);
