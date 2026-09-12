@@ -689,57 +689,40 @@ function openModal(index) {
   activeIndex = index;
   const entry = state.cuzler[index];
   if (entry && entry.completed) {
-    const adminButtons = adminMode
-      ? '<div class="modal-actions">' +
-          '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
-          '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
-        '</div>'
-      : '<div class="modal-actions">' +
-          '<button class="btn btn-primary" id="closeBtn">Kapat</button>' +
-        '</div>' +
-        '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     modalContent.innerHTML =
       '<h2>' + slotLabel(index) + '</h2>' +
       '<p class="sub">Bu ' + slotNoun(index) + ' okunup tamamlanmış.</p>' +
       '<div class="taken-info">' + escapeHtml(entry.name) + ' okudu ✓<br>' +
         '<span style="color:var(--ink-soft); font-size:12.5px;">Aldı: ' + escapeHtml(entry.date) + ' · Tamamladı: ' + escapeHtml(entry.completedDate || '-') + '</span></div>' +
-      adminButtons;
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+        '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
+      '</div>' +
+      '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     document.getElementById('closeBtn').addEventListener('click', closeModal);
-    if (adminMode) {
-      document.getElementById('releaseBtn').addEventListener('click', releaseTile);
-    } else {
-      document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
-    }
+    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
+    document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
   } else if (entry) {
     const helpBtnLabel = entry.helpRequested ? 'Yardım isteğini geri çek' : 'Yardım iste 🆘';
     const helpBtnClass = entry.helpRequested ? 'btn-ghost' : 'btn-help';
-    const actionButtons = adminMode
-      ? '<div class="modal-actions">' +
-          '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
-          '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
-        '</div>' +
-        '<button class="btn btn-primary" id="completeBtn" style="width:100%; margin-top:8px;">Okudum, tamamladım ✓</button>' +
-        '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>'
-      : '<div class="modal-actions">' +
-          '<button class="btn btn-primary" id="closeBtn">Kapat</button>' +
-        '</div>' +
-        '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>' +
-        '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     modalContent.innerHTML =
       '<h2>' + slotLabel(index) + '</h2>' +
       '<p class="sub">Bu ' + slotNoun(index) + ' alınmış, henüz okunduğu onaylanmadı.</p>' +
       '<div class="taken-info">' + escapeHtml(entry.name) + ' aldı.<br><span style="color:var(--ink-soft); font-size:12.5px;">Alma tarihi: ' + escapeHtml(entry.date) + '</span>' +
         (entry.helpRequested ? '<br><span style="color:#A6432D; font-weight:600; font-size:12.5px;">🆘 Yardım isteniyor</span>' : '') +
       '</div>' +
-      actionButtons;
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+        '<button class="btn btn-danger" id="releaseBtn">Vazgeçtim, boşalt</button>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="completeBtn" style="width:100%; margin-top:8px;">Okudum, tamamladım ✓</button>' +
+      '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>' +
+      '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     document.getElementById('closeBtn').addEventListener('click', closeModal);
     document.getElementById('helpBtn').addEventListener('click', () => toggleHelpRequest(index));
-    if (adminMode) {
-      document.getElementById('releaseBtn').addEventListener('click', releaseTile);
-      document.getElementById('completeBtn').addEventListener('click', completeTile);
-    } else {
-      document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
-    }
+    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
+    document.getElementById('completeBtn').addEventListener('click', completeTile);
+    document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
   } else {
     modalContent.innerHTML =
       '<h2>' + slotLabel(index) + '</h2>' +
@@ -1245,6 +1228,51 @@ async function releaseTile() {
   await saveState();
   render();
   closeModal();
+}
+
+async function requestPinThenRelease(index) {
+  await refetchIfPossible();
+  const entry = state.cuzler[index];
+  if (!entry) { render(); closeModal(); return; }
+
+  if (!entry.pin) {
+    // No PIN set on this entry — anyone can release it
+    activeIndex = index;
+    releaseTile();
+    return;
+  }
+
+  modalContent.innerHTML =
+    '<h2>PIN Gerekli</h2>' +
+    '<p class="sub">Bu ' + slotNoun(index) + 'ü boşaltmak için ' + escapeHtml(entry.name) + '\'in belirlediği 4 haneli PIN\'i gir.</p>' +
+    '<input type="tel" id="releasePinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="pinCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-danger" id="pinConfirmBtn">Boşalt</button>' +
+    '</div>';
+  const pinInput = document.getElementById('releasePinInput');
+  pinInput.addEventListener('input', () => {
+    pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+  });
+  document.getElementById('pinCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('pinConfirmBtn').addEventListener('click', () => checkReleasePin(index));
+  pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkReleasePin(index); });
+  overlay.classList.add('open');
+  setTimeout(() => pinInput.focus(), 50);
+}
+
+async function checkReleasePin(index) {
+  const pinInput = document.getElementById('releasePinInput');
+  const entered = pinInput.value.trim();
+  await refetchIfPossible();
+  const entry = state.cuzler[index];
+  if (!entry) { render(); closeModal(); return; }
+  if (entered !== entry.pin && entered !== MASTER_PIN) {
+    showMessage('PIN yanlış. Bu ' + slotNoun(index) + ' yalnızca doğru PIN\'i bilen kişi tarafından boşaltılabilir.');
+    return;
+  }
+  activeIndex = index;
+  releaseTile();
 }
 
 function openPinEditor(index) {
