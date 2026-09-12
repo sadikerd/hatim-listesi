@@ -269,11 +269,35 @@
     margin-bottom: 4px;
   }
 
+  .view-toggle {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .view-toggle-btn {
+    background: var(--white);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+
+  .view-toggle-btn.active {
+    background: var(--emerald);
+    border-color: var(--emerald);
+    color: var(--white);
+  }
+
   .grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 10px;
   }
 
   @media (min-width: 480px) {
@@ -289,6 +313,33 @@
     cursor: pointer;
     transition: border-color 0.15s ease, transform 0.1s ease;
     position: relative;
+  }
+
+  .grid.list-mode {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .grid.list-mode .tile {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 10px 14px;
+    gap: 12px;
+  }
+
+  .grid.list-mode .tile .num {
+    flex-shrink: 0;
+    min-width: 34px;
+    font-size: 16px;
+  }
+
+  .grid.list-mode .tile .status {
+    margin-top: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .tile:active { transform: scale(0.97); }
@@ -569,6 +620,11 @@
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="progress-label" id="progressLabel">Yükleniyor…</div>
 
+  <div class="view-toggle">
+    <button class="view-toggle-btn" id="viewGridBtn">▦ Kare</button>
+    <button class="view-toggle-btn" id="viewListBtn">☰ Liste</button>
+  </div>
+
   <div id="grid" class="grid"></div>
 
   <p class="note" id="footNote"></p>
@@ -635,6 +691,8 @@ let selectedHatimId = null; // sadece bu tarayıcıda geçerli — hangi hatime 
 let activeIndex = null;
 
 const gridEl = document.getElementById('grid');
+const viewGridBtn = document.getElementById('viewGridBtn');
+const viewListBtn = document.getElementById('viewListBtn');
 const overlay = document.getElementById('overlay');
 const modalContent = document.getElementById('modalContent');
 const progressFill = document.getElementById('progressFill');
@@ -653,6 +711,7 @@ const menuBtn = document.getElementById('menuBtn');
 
 let storageOk = true;
 let adminMode = false; // session-only — resets on page reload, on purpose
+let viewMode = 'grid'; // 'grid' | 'list' — sadece bu tarayıcıda geçerli
 let countdownTimer = null;
 const MASTER_PIN = '1001'; // always works — for you, in case anyone forgets a code
 
@@ -835,6 +894,9 @@ function render() {
   updateCountdown();
 
   const helpNumbers = [];
+  gridEl.className = 'grid' + (viewMode === 'list' ? ' list-mode' : '');
+  viewGridBtn.className = 'view-toggle-btn' + (viewMode === 'grid' ? ' active' : '');
+  viewListBtn.className = 'view-toggle-btn' + (viewMode === 'list' ? ' active' : '');
   gridEl.innerHTML = '';
   for (let i = 0; i < TOTAL; i++) {
     const entry = cuzler[i];
@@ -1657,6 +1719,9 @@ function openMainMenu() {
 }
 
 menuBtn.addEventListener('click', openMainMenu);
+
+viewGridBtn.addEventListener('click', () => { viewMode = 'grid'; render(); });
+viewListBtn.addEventListener('click', () => { viewMode = 'list'; render(); });
 
 overlay.addEventListener('click', (e) => {
   if (e.target === overlay) closeModal();
