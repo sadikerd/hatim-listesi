@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatim</title>
+<link rel="icon" type="image/png" href="favicon.png">
+
+<!-- Open Graph / WhatsApp link preview — requires og-image.png uploaded in the same folder as this file -->
+<meta property="og:title" content="Hatim — Cüz Dağılım Listesi">
+<meta property="og:description" content="Boş bir cüze dokun, ismini yaz, senin olsun.">
+<meta property="og:image" content="og-image.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hatim — Cüz Dağılım Listesi">
+<meta name="twitter:description" content="Boş bir cüze dokun, ismini yaz, senin olsun.">
+<meta name="twitter:image" content="og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5EFE1;
+    --paper-deep: #ECE3CC;
+    --ink: #26301F;
+    --ink-soft: #5B6350;
+    --emerald: #1E4D3B;
+    --emerald-deep: #143327;
+    --gold: #B08A2E;
+    --gold-soft: #D9C68F;
+    --line: #D8CBA8;
+    --white: #FFFDF8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Work Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 28px 18px 60px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+
+  header .logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    margin-bottom: 6px;
+  }
+
+  header .kicker {
+    font-family: 'Amiri', serif;
+    font-size: 30px;
+    color: var(--emerald-deep);
+    letter-spacing: 0.5px;
+    margin: 0 0 4px;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .info-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+
+  .info-item + .info-item {
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+  }
+
+  .info-label {
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+
+  .info-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--emerald-deep);
+  }
+
+  .info-editable {
+    cursor: pointer;
+    text-decoration: underline dotted var(--gold-soft);
+    text-underline-offset: 3px;
+  }
+
+  .countdown-banner {
+    text-align: center;
+    font-size: 13px;
+    color: var(--emerald-deep);
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 10px 0 0;
+    font-weight: 500;
+  }
+
+  .countdown-banner.empty {
+    color: var(--ink-soft);
+    font-weight: 400;
+    cursor: pointer;
+  }
+
+  .countdown-banner.overdue {
+    color: #A6432D;
+    background: #F3E2DC;
+    border-color: #E0B7AC;
+  }
+
+  .help-banner {
+    text-align: center;
+    font-size: 12.5px;
+    color: #A6432D;
+    background: #F3E2DC;
+    border: 1px solid #E0B7AC;
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin-top: 8px;
+    font-weight: 500;
+    display: none;
+  }
+
+  .help-banner.show { display: block; }
+
+  .tile.pending.help {
+    border-color: #C0523A;
+    box-shadow: 0 0 0 1px #C0523A inset;
+  }
+
+  .tile.pending.help .status {
+    color: #A6432D;
+    font-weight: 600;
+  }
+
+  .actions-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1;
+    min-width: 90px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    color: var(--emerald-deep);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 9px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: normal;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .reset-btn {
+    background: transparent;
+    border: 1px solid #E0B7AC;
+    color: #A6432D;
+  }
+
+  .who-took-list {
+    list-style: none;
+    margin: 0 0 14px;
+    padding: 0;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .who-took-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+
+  .who-took-list li span.count {
+    color: var(--ink-soft);
+    font-size: 12.5px;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--paper-deep);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 18px 0 6px;
+    border: 1px solid var(--line);
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--emerald);
+    transition: width 0.4s ease;
+  }
+
+  .progress-label {
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  @media (min-width: 480px) {
+    .grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .tile {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 8px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+    position: relative;
+  }
+
+  .tile:active { transform: scale(0.97); }
+
+  .tile.available {
+    border-color: var(--emerald);
+  }
+
+  .tile.pending {
+    background: var(--paper-deep);
+    border-color: var(--gold-soft);
+  }
+
+  .tile.completed {
+    background: var(--emerald-deep);
+    border-color: var(--emerald-deep);
+  }
+
+  .tile .num {
+    font-family: 'Amiri', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--emerald-deep);
+    display: block;
+    line-height: 1;
+  }
+
+  .tile.pending .num {
+    color: #9C8654;
+  }
+
+  .tile.completed .num,
+  .tile.completed .status {
+    color: var(--white);
+  }
+
+  .tile .status {
+    display: block;
+    margin-top: 5px;
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .tile.available .status {
+    color: var(--emerald);
+    font-weight: 500;
+  }
+
+  .tile .clear-x {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    font-size: 11px;
+    color: var(--gold);
+    opacity: 0.7;
+  }
+
+  /* Modal */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(38,48,31,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+
+  .overlay.open { display: flex; }
+
+  .modal {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 22px 20px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+  }
+
+  .modal h2 {
+    font-family: 'Amiri', serif;
+    color: var(--emerald-deep);
+    margin: 0 0 4px;
+    font-size: 24px;
+  }
+
+  .modal .sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0 0 16px;
+  }
+
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    margin-bottom: 12px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .modal input:focus {
+    outline: none;
+    border-color: var(--emerald);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--emerald);
+    color: var(--white);
+  }
+
+  .btn-primary:disabled {
+    background: var(--gold-soft);
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: #A6432D;
+    border: 1px solid #E0B7AC;
+  }
+
+  .btn-help {
+    background: #A6432D;
+    color: var(--white);
+  }
+
+  .pin-hint {
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: right;
+    margin: -4px 0 12px;
+    cursor: pointer;
+    text-decoration: underline dotted var(--gold-soft);
+    text-underline-offset: 2px;
+  }
+
+  .taken-info {
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+
+  .note {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin-top: 24px;
+    line-height: 1.5;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="logo.png" alt="Harmonie31">
+    <p class="kicker">Hatim</p>
+    <p class="info-editable" id="descriptionText">Boş bir cüze dokunup ismini yaz, senin olsun.</p>
+  </header>
+
+  <div class="info-bar">
+    <div class="info-item" id="roundItem">
+      <span class="info-label">Hatim Adı</span>
+      <span class="info-value info-editable" id="roundValue">—</span>
+    </div>
+    <div class="info-item" id="hatimStartItem">
+      <span class="info-label">Hatim açılma tarihi</span>
+      <span class="info-value info-editable" id="hatimStartValue">—</span>
+    </div>
+    <div class="info-item" id="targetDateItem">
+      <span class="info-label">Son okuma tarihi</span>
+      <span class="info-value info-editable" id="targetDateValue">—</span>
+    </div>
+  </div>
+
+  <div class="countdown-banner" id="countdownBanner"></div>
+  <div class="help-banner" id="helpBanner"></div>
+
+  <div class="actions-row">
+    <button class="action-btn" id="menuBtn">☰ Menü</button>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-label" id="progressLabel">Yükleniyor…</div>
+
+  <div id="grid" class="grid"></div>
+
+  <p class="note" id="footNote"></p>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script type="module">
+// ============================================================
+// FIREBASE AYARLARI — buraya kendi Firebase projenin bilgilerini yapıştır.
+// Firebase Console → Project settings → "Your apps" → Web app (</>) → SDK config
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDsCym6EnVkExGhkHfiq7ZDxTDLd7Bo8q4",
+  authDomain: "hatim-listesi.firebaseapp.com",
+  projectId: "hatim-listesi",
+  storageBucket: "hatim-listesi.firebasestorage.app",
+  messagingSenderId: "405125432005",
+  appId: "1:405125432005:web:6385f3ccb449623b64a6ac"
+};
+
+// Firestore güvenlik kuralları (Firebase Console → Firestore Database → Rules):
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     match /hatim/{document} {
+//       allow read, write: if true;
+//     }
+//   }
+// }
+// Not: Bu kural herkese açık okuma/yazma verir (giriş/şifre sistemi olmadığı için).
+// Uygulamanın PIN korumaları yine geçerli, ama teknik bilgisi olan biri Firestore'a
+// doğrudan da yazabilir. Aile/arkadaş grubu için bu seviye yeterli.
+
+let db = null;
+let firebaseReady = false;
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('BURAYA') === -1) {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    firebaseReady = true;
+  }
+} catch (e) {
+  firebaseReady = false;
+}
+
+function stateDocRef() {
+  return doc(db, 'hatim', 'state');
+}
+
+const TOTAL = 30;
+// state = { hatimName, hatimStart, targetDate, description, adminPin, archive: [...], cuzler: [{name, date, completed, completedDate, pin, helpRequested}|null, ...30] }
+let state = null;
+let activeIndex = null;
+
+const gridEl = document.getElementById('grid');
+const overlay = document.getElementById('overlay');
+const modalContent = document.getElementById('modalContent');
+const progressFill = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const footNote = document.getElementById('footNote');
+const roundValue = document.getElementById('roundValue');
+const roundItem = document.getElementById('roundItem');
+const hatimStartValue = document.getElementById('hatimStartValue');
+const hatimStartItem = document.getElementById('hatimStartItem');
+const targetDateValue = document.getElementById('targetDateValue');
+const targetDateItem = document.getElementById('targetDateItem');
+const descriptionText = document.getElementById('descriptionText');
+const countdownBanner = document.getElementById('countdownBanner');
+const helpBanner = document.getElementById('helpBanner');
+const menuBtn = document.getElementById('menuBtn');
+
+let storageOk = true;
+let countdownTimer = null;
+const MASTER_PIN = '1001'; // always works — for you, in case anyone forgets a code
+
+function todayStr() {
+  const d = new Date();
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+}
+
+function freshState() {
+  return { hatimName: '1. Hatim', hatimStart: null, targetDate: null, description: 'Boş bir cüze dokunup ismini yaz, senin olsun.', adminPin: null, archive: [], cuzler: new Array(TOTAL).fill(null) };
+}
+
+async function loadState() {
+  if (!firebaseReady) {
+    storageOk = false;
+    state = freshState();
+    render();
+    progressLabel.textContent = 'Firebase ayarları eksik — script içindeki firebaseConfig kısmını doldurman gerekiyor.';
+    return;
+  }
+  try {
+    const snap = await getDoc(stateDocRef());
+    if (snap.exists()) {
+      state = snap.data();
+      if (!state.archive) state.archive = [];
+    } else {
+      state = freshState();
+      await setDoc(stateDocRef(), state);
+    }
+  } catch (e) {
+    storageOk = false;
+    state = freshState();
+    progressLabel.textContent = 'Firebase\'e bağlanılamadı — ayarları ve Firestore kurallarını kontrol et.';
+  }
+  render();
+
+  // Canlı senkronizasyon: biri bir değişiklik yaptığında herkesin ekranı otomatik güncellenir.
+  if (firebaseReady) {
+    try {
+      onSnapshot(stateDocRef(), (snap) => {
+        if (!snap.exists()) return;
+        if (overlay.classList.contains('open')) return; // açık bir pencere varken üzerine yazma
+        state = snap.data();
+        if (!state.archive) state.archive = [];
+        render();
+      });
+    } catch (e) { /* canlı senkronizasyon başlatılamadı, sorun değil */ }
+  }
+}
+
+async function saveState() {
+  if (!storageOk || !firebaseReady) return;
+  try {
+    await setDoc(stateDocRef(), state);
+  } catch (e) {
+    storageOk = false;
+    footNote.textContent = 'Değişiklik kaydedilemedi — bağlantı sorunu olabilir, sayfayı yenile.';
+  }
+}
+
+function render() {
+  const cuzler = state.cuzler;
+  const takenCount = cuzler.filter(Boolean).length;
+  const completedCount = cuzler.filter((e) => e && e.completed).length;
+  progressFill.style.width = (takenCount / TOTAL * 100) + '%';
+  progressLabel.textContent = takenCount + ' / ' + TOTAL + ' cüz alındı, ' + completedCount + ' tamamlandı';
+  footNote.textContent = 'Bu liste herkese açık — burada kim neyi aldığını görebilir.';
+  roundValue.textContent = state.hatimName || 'Girilmedi';
+  hatimStartValue.textContent = state.hatimStart || 'Girilmedi';
+  targetDateValue.textContent = state.targetDate || 'Girilmedi';
+  descriptionText.textContent = state.description || 'Boş bir cüze dokunup ismini yaz, senin olsun.';
+  updateCountdown();
+
+  const helpNumbers = [];
+  gridEl.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const entry = cuzler[i];
+    const tile = document.createElement('div');
+    let cls = 'available';
+    let statusText = 'Boş';
+    if (entry) {
+      cls = entry.completed ? 'completed' : 'pending';
+      if (!entry.completed && entry.helpRequested) {
+        cls += ' help';
+        helpNumbers.push(i + 1);
+      }
+      statusText = escapeHtml(entry.name) + (entry.completed ? ' ✓' : (entry.helpRequested ? ' · 🆘 yardım' : ' · alındı'));
+    }
+    tile.className = 'tile ' + cls;
+    tile.innerHTML =
+      '<span class="num">' + (i + 1) + '</span>' +
+      '<span class="status">' + statusText + '</span>';
+    tile.addEventListener('click', () => openModal(i));
+    gridEl.appendChild(tile);
+  }
+
+  if (helpNumbers.length > 0) {
+    helpBanner.textContent = '🆘 Yardım isteyen cüzler: ' + helpNumbers.join(', ') + ' — bir el atabilirsen dokunup bak.';
+    helpBanner.className = 'help-banner show';
+  } else {
+    helpBanner.className = 'help-banner';
+  }
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function openModal(index) {
+  activeIndex = index;
+  const entry = state.cuzler[index];
+  if (entry && entry.completed) {
+    modalContent.innerHTML =
+      '<h2>' + (index + 1) + '. Cüz</h2>' +
+      '<p class="sub">Bu cüz okunup tamamlanmış.</p>' +
+      '<div class="taken-info">' + escapeHtml(entry.name) + ' okudu ✓<br>' +
+        '<span style="color:var(--ink-soft); font-size:12.5px;">Aldı: ' + escapeHtml(entry.date) + ' · Tamamladı: ' + escapeHtml(entry.completedDate || '-') + '</span></div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+        '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
+      '</div>';
+    document.getElementById('closeBtn').addEventListener('click', closeModal);
+    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
+  } else if (entry) {
+    const helpBtnLabel = entry.helpRequested ? 'Yardım isteğini geri çek' : 'Yardım iste 🆘';
+    const helpBtnClass = entry.helpRequested ? 'btn-ghost' : 'btn-help';
+    modalContent.innerHTML =
+      '<h2>' + (index + 1) + '. Cüz</h2>' +
+      '<p class="sub">Bu cüz alınmış, henüz okunduğu onaylanmadı.</p>' +
+      '<div class="taken-info">' + escapeHtml(entry.name) + ' aldı.<br><span style="color:var(--ink-soft); font-size:12.5px;">Alma tarihi: ' + escapeHtml(entry.date) + '</span>' +
+        (entry.helpRequested ? '<br><span style="color:#A6432D; font-weight:600; font-size:12.5px;">🆘 Yardım isteniyor</span>' : '') +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+        '<button class="btn btn-danger" id="releaseBtn">Vazgeçtim, boşalt</button>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="completeBtn" style="width:100%; margin-top:8px;">Okudum, tamamladım ✓</button>' +
+      '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>';
+    document.getElementById('closeBtn').addEventListener('click', closeModal);
+    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
+    document.getElementById('completeBtn').addEventListener('click', completeTile);
+    document.getElementById('helpBtn').addEventListener('click', () => toggleHelpRequest(index));
+  } else {
+    modalContent.innerHTML =
+      '<h2>' + (index + 1) + '. Cüz</h2>' +
+      '<p class="sub">Bu cüz boş. Almak için ismini yaz.</p>' +
+      '<input type="text" id="nameInput" placeholder="İsmin" maxlength="30" autofocus>' +
+      '<input type="tel" id="pinInput" placeholder="4 haneli PIN (opsiyonel)" maxlength="4" inputmode="numeric" pattern="[0-9]*">' +
+      '<p class="pin-hint" id="pinHintBtn">Bu PIN ne işe yarar? →</p>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="cancelBtn">Vazgeç</button>' +
+        '<button class="btn btn-primary" id="claimBtn" disabled>Al</button>' +
+      '</div>';
+    const input = document.getElementById('nameInput');
+    const pinInput = document.getElementById('pinInput');
+    const claimBtn = document.getElementById('claimBtn');
+    function checkValid() {
+      claimBtn.disabled = input.value.trim().length === 0;
+    }
+    input.addEventListener('input', checkValid);
+    pinInput.addEventListener('input', () => {
+      pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') pinInput.focus();
+    });
+    pinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !claimBtn.disabled) claimTile();
+    });
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    document.getElementById('pinHintBtn').addEventListener('click', showPinExplanation);
+    claimBtn.addEventListener('click', claimTile);
+    setTimeout(() => input.focus(), 50);
+  }
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  overlay.classList.remove('open');
+  activeIndex = null;
+}
+
+function showMessage(message) {
+  modalContent.innerHTML =
+    '<h2>Bilgi</h2>' +
+    '<p class="sub">' + escapeHtml(message) + '</p>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="okBtn">Tamam</button>' +
+    '</div>';
+  document.getElementById('okBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+function showConfirm(message, onConfirm) {
+  modalContent.innerHTML =
+    '<h2>Onay</h2>' +
+    '<p class="sub">' + escapeHtml(message) + '</p>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="confirmCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-danger" id="confirmOkBtn">Evet, eminim</button>' +
+    '</div>';
+  document.getElementById('confirmCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('confirmOkBtn').addEventListener('click', () => {
+    closeModal();
+    onConfirm();
+  });
+  overlay.classList.add('open');
+}
+
+function showPinExplanation() {
+  const nameVal = document.getElementById('nameInput') ? document.getElementById('nameInput').value : '';
+  const pinVal = document.getElementById('pinInput') ? document.getElementById('pinInput').value : '';
+  const index = activeIndex;
+  modalContent.innerHTML =
+    '<h2>PIN ne işe yarar?</h2>' +
+    '<p class="sub">Bu PIN\'i girmek zorunda değilsin. İstersen 4 haneli bir PIN belirle — o zaman bu cüzü sadece bu PIN\'i bilen biri boşaltabilir. PIN girmezsen, cüzü herkes boşaltabilir.</p>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="pinHintOkBtn">Anladım, geri dön</button>' +
+    '</div>';
+  document.getElementById('pinHintOkBtn').addEventListener('click', () => {
+    openModal(index);
+    const nameInput = document.getElementById('nameInput');
+    const pinInput = document.getElementById('pinInput');
+    if (nameInput) nameInput.value = nameVal;
+    if (pinInput) pinInput.value = pinVal;
+    const claimBtn = document.getElementById('claimBtn');
+    if (claimBtn) claimBtn.disabled = nameVal.trim().length === 0;
+  });
+  overlay.classList.add('open');
+}
+
+function openRoundEditor() {
+  modalContent.innerHTML =
+    '<h2>Hatim Adı</h2>' +
+    '<p class="sub">Bu hatime bir isim ver.</p>' +
+    '<input type="text" id="roundInput" value="' + escapeHtml(state.hatimName || '') + '" maxlength="40" placeholder="Örn: 23. Hatim, Ramazan Hatimi" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="roundCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-primary" id="roundSaveBtn">Kaydet</button>' +
+    '</div>';
+  document.getElementById('roundCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('roundSaveBtn').addEventListener('click', saveRound);
+  const input = document.getElementById('roundInput');
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveRound(); });
+  overlay.classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+async function saveRound() {
+  const input = document.getElementById('roundInput');
+  const val = input.value.trim();
+  if (!val) { showMessage('Bir hatim adı yaz.'); return; }
+  await refetchIfPossible();
+  state.hatimName = val;
+  await saveState();
+  render();
+  closeModal();
+}
+
+roundItem.addEventListener('click', () => requireAdminPin(openRoundEditor));
+
+// Convert DD.MM.YYYY -> YYYY-MM-DD for <input type="date">, and back
+function toDateInputValue(str) {
+  if (!str) return '';
+  const cuzler = str.split('.');
+  if (cuzler.length !== 3) return '';
+  return cuzler[2] + '-' + cuzler[1] + '-' + cuzler[0];
+}
+
+function fromDateInputValue(str) {
+  if (!str) return null;
+  const cuzler = str.split('-');
+  if (cuzler.length !== 3) return null;
+  return cuzler[2] + '.' + cuzler[1] + '.' + cuzler[0];
+}
+
+function openDateEditor(fieldKey, label) {
+  const current = toDateInputValue(state[fieldKey]);
+  modalContent.innerHTML =
+    '<h2>' + escapeHtml(label) + '</h2>' +
+    '<p class="sub">Tarihi elle seç.</p>' +
+    '<input type="date" id="dateInput" value="' + current + '" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="dateCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-primary" id="dateSaveBtn">Kaydet</button>' +
+    '</div>';
+  document.getElementById('dateCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('dateSaveBtn').addEventListener('click', () => saveDate(fieldKey));
+  overlay.classList.add('open');
+}
+
+async function saveDate(fieldKey) {
+  const input = document.getElementById('dateInput');
+  const val = fromDateInputValue(input.value);
+  if (!val) { showMessage('Geçerli bir tarih seç.'); return; }
+  await refetchIfPossible();
+  state[fieldKey] = val;
+  await saveState();
+  render();
+  closeModal();
+}
+
+hatimStartItem.addEventListener('click', () => requireAdminPin(() => openDateEditor('hatimStart', 'Hatim Açılma Tarihi')));
+targetDateItem.addEventListener('click', () => requireAdminPin(() => openDateEditor('targetDate', 'Son Okuma Tarihi')));
+descriptionText.addEventListener('click', () => requireAdminPin(openDescriptionEditor));
+
+function openDescriptionEditor() {
+  modalContent.innerHTML =
+    '<h2>Açıklama</h2>' +
+    '<p class="sub">Sayfanın üstünde görünen açıklama metnini düzenle.</p>' +
+    '<input type="text" id="descInput" value="' + escapeHtml(state.description || '') + '" maxlength="120" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="descCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-primary" id="descSaveBtn">Kaydet</button>' +
+    '</div>';
+  document.getElementById('descCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('descSaveBtn').addEventListener('click', saveDescription);
+  const input = document.getElementById('descInput');
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveDescription(); });
+  overlay.classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+async function saveDescription() {
+  const input = document.getElementById('descInput');
+  const val = input.value.trim();
+  await refetchIfPossible();
+  state.description = val;
+  await saveState();
+  render();
+  closeModal();
+}
+
+// --- Admin PIN gate ---
+// First use: no admin PIN set yet, so whoever clicks first sets it.
+// After that, every protected action (name, dates, description, reset) requires it.
+function requireAdminPin(onSuccess) {
+  if (!state.adminPin) {
+    modalContent.innerHTML =
+      '<h2>Yönetici PIN\'i Belirle</h2>' +
+      '<p class="sub">Bu liste için henüz bir yönetici PIN\'i yok. Turu, tarihleri, açıklamayı ve sıfırlamayı korumak için 4 haneli bir PIN belirle. Bu PIN\'i not al — sadece sen bileceksin.</p>' +
+      '<input type="tel" id="adminPinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="adminPinCancelBtn">Vazgeç</button>' +
+        '<button class="btn btn-primary" id="adminPinSaveBtn">PIN\'i Belirle</button>' +
+      '</div>';
+    const input = document.getElementById('adminPinInput');
+    input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4); });
+    document.getElementById('adminPinCancelBtn').addEventListener('click', closeModal);
+    document.getElementById('adminPinSaveBtn').addEventListener('click', async () => {
+      const val = input.value.trim();
+      if (!/^[0-9]{4}$/.test(val)) { showMessage('4 haneli bir PIN gir.'); return; }
+      await refetchIfPossible();
+      if (state.adminPin) {
+        // someone else set it in the meantime — ask for it instead
+        requireAdminPin(onSuccess);
+        return;
+      }
+      state.adminPin = val;
+      await saveState();
+      closeModal();
+      onSuccess();
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('adminPinSaveBtn').click(); });
+    overlay.classList.add('open');
+    setTimeout(() => input.focus(), 50);
+    return;
+  }
+
+  modalContent.innerHTML =
+    '<h2>Yönetici PIN\'i</h2>' +
+    '<p class="sub">Bu değişiklik için yönetici PIN\'ini gir.</p>' +
+    '<input type="tel" id="adminPinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="adminPinCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-primary" id="adminPinSaveBtn">Onayla</button>' +
+    '</div>';
+  const input = document.getElementById('adminPinInput');
+  input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4); });
+  document.getElementById('adminPinCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('adminPinSaveBtn').addEventListener('click', async () => {
+    const val = input.value.trim();
+    await refetchIfPossible();
+    if (val !== state.adminPin && val !== MASTER_PIN) {
+      showMessage('PIN yanlış.');
+      return;
+    }
+    closeModal();
+    onSuccess();
+  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('adminPinSaveBtn').click(); });
+  overlay.classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+function parseDDMMYYYY(str) {
+  if (!str) return null;
+  const cuzler = str.split('.');
+  if (cuzler.length !== 3) return null;
+  // Target is due by end of that day
+  return new Date(parseInt(cuzler[2], 10), parseInt(cuzler[1], 10) - 1, parseInt(cuzler[0], 10), 23, 59, 59);
+}
+
+function updateCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  renderCountdownNow();
+  countdownTimer = setInterval(renderCountdownNow, 60000);
+}
+
+function renderCountdownNow() {
+  const target = parseDDMMYYYY(state.targetDate);
+  if (!target) {
+    countdownBanner.textContent = 'Son okuma tarihi belirlenmedi — üstteki alana dokunup ekleyebilirsin.';
+    countdownBanner.className = 'countdown-banner empty';
+    countdownBanner.onclick = () => openDateEditor('targetDate', 'Son Okuma Tarihi');
+    return;
+  }
+  countdownBanner.onclick = null;
+  const now = new Date();
+  const diffMs = target - now;
+  if (diffMs <= 0) {
+    countdownBanner.textContent = 'Son okuma tarihi geçti (' + state.targetDate + ')';
+    countdownBanner.className = 'countdown-banner overdue';
+    return;
+  }
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  let text = 'Kalan süre: ';
+  if (days > 0) text += days + ' gün ';
+  text += hours + ' saat ' + minutes + ' dk';
+  countdownBanner.textContent = text;
+  countdownBanner.className = 'countdown-banner';
+}
+
+function openWhoTook() {
+  const counts = {};
+  state.cuzler.forEach((entry) => {
+    if (!entry) return;
+    if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
+    counts[entry.name].total++;
+    if (entry.completed) counts[entry.name].completed++;
+  });
+  const names = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total || a.localeCompare(b));
+  let listHtml;
+  if (names.length === 0) {
+    listHtml = '<p class="sub">Henüz kimse cüz almadı.</p>';
+  } else {
+    listHtml = '<ul class="who-took-list">' +
+      names.map((n) => '<li><span>' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
+      '</ul>';
+  }
+  modalContent.innerHTML =
+    '<h2>Kim Aldı?</h2>' +
+    listHtml +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="whoTookCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('whoTookCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+function openQrModal() {
+  const url = window.location.href;
+  const qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
+  modalContent.innerHTML =
+    '<h2>QR Kod</h2>' +
+    '<p class="sub">Bu kodu okutan direkt listeye gelir. Yazdırıp asabilirsin.</p>' +
+    '<div style="text-align:center; margin-bottom:14px;">' +
+      '<img src="' + qrImgUrl + '" alt="QR kod" style="width:220px; height:220px; border:1px solid var(--line); border-radius:8px; background:var(--white);">' +
+    '</div>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="qrCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('qrCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+
+function openArchiveList() {
+  const archive = state.archive || [];
+  let listHtml;
+  if (archive.length === 0) {
+    listHtml = '<p class="sub">Henüz arşivlenmiş bir hatim yok. Sıfırladığında o hatim buraya kaydedilir.</p>';
+  } else {
+    listHtml = '<ul class="who-took-list">' +
+      archive.map((h, i) =>
+        '<li style="cursor:pointer;" data-idx="' + i + '"><span>' + escapeHtml(h.hatimName) + '</span>' +
+        '<span class="count">' + h.completedCount + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.archivedDate) + '</span></li>'
+      ).join('') +
+      '</ul>';
+  }
+  modalContent.innerHTML =
+    '<h2>Geçmiş Hatimler</h2>' +
+    listHtml +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-primary" id="archiveCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('archiveCloseBtn').addEventListener('click', closeModal);
+  modalContent.querySelectorAll('.who-took-list li').forEach((li) => {
+    li.addEventListener('click', () => openArchiveDetail(parseInt(li.getAttribute('data-idx'), 10)));
+  });
+  overlay.classList.add('open');
+}
+
+function openArchiveDetail(idx) {
+  const h = (state.archive || [])[idx];
+  if (!h) { openArchiveList(); return; }
+  const counts = {};
+  (h.cuzler || []).forEach((entry) => {
+    if (!entry) return;
+    if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
+    counts[entry.name].total++;
+    if (entry.completed) counts[entry.name].completed++;
+  });
+  const names = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total || a.localeCompare(b));
+  const peopleHtml = names.length === 0
+    ? '<p class="sub">Kayıtlı kişi yok.</p>'
+    : '<ul class="who-took-list">' +
+        names.map((n) => '<li><span>' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
+      '</ul>';
+  modalContent.innerHTML =
+    '<h2>' + escapeHtml(h.hatimName) + '</h2>' +
+    '<p class="sub">Açılış: ' + escapeHtml(h.hatimStart || '—') + ' · Bitiş: ' + escapeHtml(h.archivedDate) + '<br>' +
+      h.completedCount + ' / ' + TOTAL + ' cüz okunmuş (' + h.takenCount + ' alınmıştı).</p>' +
+    peopleHtml +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="archiveBackBtn">Geri</button>' +
+      '<button class="btn btn-primary" id="archiveDetailCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('archiveBackBtn').addEventListener('click', openArchiveList);
+  document.getElementById('archiveDetailCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+
+function getRemainingTimeCaps() {
+  const target = parseDDMMYYYY(state.targetDate);
+  if (!target) return 'BELİRLENMEDİ';
+  const now = new Date();
+  const diffMs = target - now;
+  if (diffMs <= 0) return 'SÜRE DOLDU';
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  let text = '';
+  if (days > 0) text += days + ' GÜN ';
+  text += hours + ' SAAT ' + minutes + ' DK';
+  return text;
+}
+
+function shareOnWhatsApp() {
+  const takenCount = state.cuzler.filter(Boolean).length;
+  const completedCount = state.cuzler.filter((e) => e && e.completed).length;
+  const emptyNumbers = [];
+  const helpNumbers = [];
+  state.cuzler.forEach((entry, i) => {
+    if (!entry) emptyNumbers.push(i + 1);
+    else if (!entry.completed && entry.helpRequested) helpNumbers.push(i + 1);
+  });
+  const url = window.location.href;
+
+  const lines = [];
+  lines.push('*' + (state.hatimName || 'Hatim') + '*' + ' için cüz paylaşımı 🌙');
+  lines.push('');
+  lines.push('*Hatim açılma tarihi:* ' + (state.hatimStart || 'girilmedi'));
+  lines.push('*Son okuma tarihi:* ' + (state.targetDate || 'girilmedi'));
+  lines.push('*KALAN SÜRE:* ' + getRemainingTimeCaps());
+  lines.push('');
+  lines.push('*' + takenCount + ' / ' + TOTAL + '* cüz alındı, *' + completedCount + '* tamamlandı.');
+  lines.push('');
+  if (emptyNumbers.length > 0) {
+    lines.push('*Boş cüzler:* ' + emptyNumbers.join(', '));
+  } else {
+    lines.push('*Boş cüz kalmadı* 🎉');
+  }
+  if (helpNumbers.length > 0) {
+    lines.push('');
+    lines.push('🆘 *Yardım isteyen cüzler:* ' + helpNumbers.join(', '));
+  }
+  lines.push('');
+  lines.push('Boş bir cüzü almak için linke gir:');
+  lines.push(url);
+
+  const message = lines.join('\n');
+  const waUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+  window.open(waUrl, '_blank');
+}
+
+
+async function refetchIfPossible() {
+  if (!storageOk || !firebaseReady) return;
+  try {
+    const snap = await getDoc(stateDocRef());
+    if (snap.exists()) {
+      state = snap.data();
+      if (!state.archive) state.archive = [];
+    }
+  } catch (e) { /* keep local state if refetch fails */ }
+}
+
+async function claimTile() {
+  const input = document.getElementById('nameInput');
+  const pinInput = document.getElementById('pinInput');
+  const name = input.value.trim();
+  const rawPin = pinInput.value.trim();
+  if (!name) return;
+  if (rawPin && !/^[0-9]{4}$/.test(rawPin)) {
+    showMessage('PIN 4 haneli olmalı, ya da boş bırak.');
+    return;
+  }
+  const pin = rawPin || null;
+
+  // Re-fetch latest state to avoid overwriting someone else's claim
+  await refetchIfPossible();
+  if (state.cuzler[activeIndex]) {
+    // someone else claimed it in the meantime
+    render();
+    showMessage('Bu cüz az önce başka biri tarafından alındı.');
+    return;
+  }
+  state.cuzler[activeIndex] = { name: name, date: todayStr(), completed: false, completedDate: null, pin: pin, helpRequested: false };
+  await saveState();
+  render();
+  closeModal();
+  if (pin) {
+    showMessage('Cüz senin oldu! PIN\'in: ' + pin + ' — boşaltmak istediğinde bu PIN\'i gireceksin, not almayı unutma.');
+  } else {
+    showMessage('Cüz senin oldu! PIN belirlemediğin için bu cüzü herkes boşaltabilir.');
+  }
+}
+
+async function completeTile() {
+  await refetchIfPossible();
+  const entry = state.cuzler[activeIndex];
+  if (!entry) { render(); closeModal(); return; }
+  entry.completed = true;
+  entry.completedDate = todayStr();
+  entry.helpRequested = false;
+  await saveState();
+  render();
+  closeModal();
+}
+
+async function toggleHelpRequest(index) {
+  await refetchIfPossible();
+  const entry = state.cuzler[index];
+  if (!entry) { render(); closeModal(); return; }
+  entry.helpRequested = !entry.helpRequested;
+  await saveState();
+  render();
+  closeModal();
+}
+
+async function releaseTile() {
+  await refetchIfPossible();
+  state.cuzler[activeIndex] = null;
+  await saveState();
+  render();
+  closeModal();
+}
+
+async function requestPinThenRelease(index) {
+  await refetchIfPossible();
+  const entry = state.cuzler[index];
+  if (!entry) { render(); closeModal(); return; }
+
+  if (!entry.pin) {
+    // Legacy entry with no PIN set — allow direct release
+    releaseTile();
+    return;
+  }
+
+  modalContent.innerHTML =
+    '<h2>PIN Gerekli</h2>' +
+    '<p class="sub">Bu cüzü boşaltmak için ' + escapeHtml(entry.name) + '\'in belirlediği 4 haneli PIN\'i gir.</p>' +
+    '<input type="tel" id="releasePinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-ghost" id="pinCancelBtn">Vazgeç</button>' +
+      '<button class="btn btn-danger" id="pinConfirmBtn">Boşalt</button>' +
+    '</div>';
+  const pinInput = document.getElementById('releasePinInput');
+  pinInput.addEventListener('input', () => {
+    pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+  });
+  document.getElementById('pinCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('pinConfirmBtn').addEventListener('click', () => checkReleasePin(index));
+  pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkReleasePin(index); });
+  overlay.classList.add('open');
+  setTimeout(() => pinInput.focus(), 50);
+}
+
+async function checkReleasePin(index) {
+  const pinInput = document.getElementById('releasePinInput');
+  const entered = pinInput.value.trim();
+  await refetchIfPossible();
+  const entry = state.cuzler[index];
+  if (!entry) { render(); closeModal(); return; }
+  if (entered !== entry.pin && entered !== MASTER_PIN) {
+    showMessage('PIN yanlış. Bu cüzü yalnızca doğru PIN\'i bilen kişi boşaltabilir.');
+    return;
+  }
+  activeIndex = index;
+  releaseTile();
+}
+
+function resetAll() {
+  showConfirm('Tüm liste boşaltılacak ve bu hatim arşive kaydedilecek. Emin misin?', async () => {
+    await refetchIfPossible();
+    const takenCount = state.cuzler.filter(Boolean).length;
+    const completedCount = state.cuzler.filter((e) => e && e.completed).length;
+    if (!state.archive) state.archive = [];
+    state.archive.unshift({
+      hatimName: state.hatimName || 'Hatim',
+      hatimStart: state.hatimStart,
+      targetDate: state.targetDate,
+      archivedDate: todayStr(),
+      takenCount: takenCount,
+      completedCount: completedCount,
+      cuzler: state.cuzler
+    });
+    state.cuzler = new Array(TOTAL).fill(null);
+    await saveState();
+    render();
+  });
+}
+
+function openMainMenu() {
+  modalContent.innerHTML =
+    '<h2>Menü</h2>' +
+    '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
+    '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
+    '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
+    '<button class="btn btn-ghost" id="menuArchive" style="width:100%; margin-bottom:8px;">Geçmiş hatimler</button>' +
+    '<button class="btn btn-danger" id="menuReset" style="width:100%;">Sıfırla</button>' +
+    '<div class="modal-actions" style="margin-top:12px;">' +
+      '<button class="btn btn-ghost" id="menuCloseBtn">Kapat</button>' +
+    '</div>';
+  document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
+  document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
+  document.getElementById('menuQr').addEventListener('click', openQrModal);
+  document.getElementById('menuArchive').addEventListener('click', openArchiveList);
+  document.getElementById('menuReset').addEventListener('click', () => requireAdminPin(resetAll));
+  document.getElementById('menuCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+menuBtn.addEventListener('click', openMainMenu);
+
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeModal();
+});
+
+loadState();
+</script>
+</body>
+</html>
