@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hatim</title>
+<title>Hatim-i Şerif</title>
 <link rel="icon" type="image/png" href="favicon.png">
 
 <!-- Open Graph / WhatsApp link preview — requires og-image.png uploaded in the same folder as this file -->
-<meta property="og:title" content="Hatim — Cüz Dağılım Listesi">
+<meta property="og:title" content="Hatim-i Şerif — Cüz Dağılım Listesi">
 <meta property="og:description" content="Boş bir cüze dokun, ismini yaz, senin olsun.">
 <meta property="og:image" content="og-image.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Hatim — Cüz Dağılım Listesi">
+<meta name="twitter:title" content="Hatim-i Şerif — Cüz Dağılım Listesi">
 <meta name="twitter:description" content="Boş bir cüze dokun, ismini yaz, senin olsun.">
 <meta name="twitter:image" content="og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,11 +57,13 @@
     height: 56px;
     border-radius: 50%;
     margin-bottom: 6px;
+    border: 2px solid var(--gold-soft);
+    box-shadow: 0 3px 10px rgba(38, 48, 31, 0.25);
   }
 
   header .kicker {
     font-family: 'Amiri', serif;
-    font-size: 30px;
+    font-size: 26px;
     color: var(--emerald-deep);
     letter-spacing: 0.5px;
     margin: 0 0 4px;
@@ -263,6 +265,10 @@
     border-color: var(--emerald);
   }
 
+  .tile.dua {
+    border-style: dashed;
+  }
+
   .tile.pending {
     background: var(--paper-deep);
     border-color: var(--gold-soft);
@@ -448,7 +454,7 @@
 <div class="wrap">
   <header>
     <img class="logo" src="logo.png" alt="Harmonie31">
-    <p class="kicker">Hatim</p>
+    <p class="kicker">Hatim-i Şerif</p>
     <p class="info-editable" id="descriptionText">Boş bir cüze dokunup ismini yaz, senin olsun.</p>
   </header>
 
@@ -532,7 +538,8 @@ function stateDocRef() {
   return doc(db, 'hatim', 'state');
 }
 
-const TOTAL = 30;
+const CUZ_TOTAL = 30;
+const TOTAL = 31; // 30 cüz + 1 hatim duası
 // state = { hatimName, hatimStart, targetDate, description, adminPin, archive: [...], cuzler: [{name, date, completed, completedDate, pin, helpRequested}|null, ...30] }
 let state = null;
 let activeIndex = null;
@@ -555,8 +562,17 @@ const helpBanner = document.getElementById('helpBanner');
 const menuBtn = document.getElementById('menuBtn');
 
 let storageOk = true;
+let adminMode = false; // session-only — resets on page reload, on purpose
 let countdownTimer = null;
 const MASTER_PIN = '1001'; // always works — for you, in case anyone forgets a code
+
+function slotLabel(index) {
+  return index < CUZ_TOTAL ? (index + 1) + '. Cüz' : 'Hatim Duası';
+}
+
+function slotNoun(index) {
+  return index < CUZ_TOTAL ? 'cüz' : 'hatim duası';
+}
 
 function todayStr() {
   const d = new Date();
@@ -564,7 +580,7 @@ function todayStr() {
 }
 
 function freshState() {
-  return { hatimName: '1. Hatim', hatimStart: null, targetDate: null, description: 'Boş bir cüze dokunup ismini yaz, senin olsun.', adminPin: null, archive: [], cuzler: new Array(TOTAL).fill(null) };
+  return { hatimName: '1. Hatim', hatimStart: null, targetDate: null, description: 'Boş bir cüze dokunup ismini yaz, senin olsun.', archive: [], cuzler: new Array(TOTAL).fill(null) };
 }
 
 async function loadState() {
@@ -620,18 +636,22 @@ function render() {
   const takenCount = cuzler.filter(Boolean).length;
   const completedCount = cuzler.filter((e) => e && e.completed).length;
   progressFill.style.width = (takenCount / TOTAL * 100) + '%';
-  progressLabel.textContent = takenCount + ' / ' + TOTAL + ' cüz alındı, ' + completedCount + ' tamamlandı';
-  footNote.textContent = 'Bu liste herkese açık — burada kim neyi aldığını görebilir.';
+  progressLabel.textContent = takenCount + ' / ' + TOTAL + ' alındı (30 cüz + hatim duası), ' + completedCount + ' tamamlandı';
+  footNote.textContent = adminMode
+    ? '🔓 Yönetici modu açık — isim, tarih, açıklama değiştirilebilir; cüzler tamamlanabilir/boşaltılabilir.'
+    : 'Bu liste herkese açık — burada kim neyi aldığını görebilir.';
   roundValue.textContent = state.hatimName || 'Girilmedi';
   hatimStartValue.textContent = state.hatimStart || 'Girilmedi';
   targetDateValue.textContent = state.targetDate || 'Girilmedi';
   descriptionText.textContent = state.description || 'Boş bir cüze dokunup ismini yaz, senin olsun.';
+  menuBtn.textContent = adminMode ? '☰ Menü 🔓' : '☰ Menü';
   updateCountdown();
 
   const helpNumbers = [];
   gridEl.innerHTML = '';
   for (let i = 0; i < TOTAL; i++) {
     const entry = cuzler[i];
+    const isDua = i >= CUZ_TOTAL;
     const tile = document.createElement('div');
     let cls = 'available';
     let statusText = 'Boş';
@@ -639,13 +659,13 @@ function render() {
       cls = entry.completed ? 'completed' : 'pending';
       if (!entry.completed && entry.helpRequested) {
         cls += ' help';
-        helpNumbers.push(i + 1);
+        helpNumbers.push(isDua ? 'Hatim Duası' : (i + 1));
       }
       statusText = escapeHtml(entry.name) + (entry.completed ? ' ✓' : (entry.helpRequested ? ' · 🆘 yardım' : ' · alındı'));
     }
-    tile.className = 'tile ' + cls;
+    tile.className = 'tile ' + cls + (isDua ? ' dua' : '');
     tile.innerHTML =
-      '<span class="num">' + (i + 1) + '</span>' +
+      '<span class="num">' + (isDua ? 'Dua' : (i + 1)) + '</span>' +
       '<span class="status">' + statusText + '</span>';
     tile.addEventListener('click', () => openModal(i));
     gridEl.appendChild(tile);
@@ -669,40 +689,61 @@ function openModal(index) {
   activeIndex = index;
   const entry = state.cuzler[index];
   if (entry && entry.completed) {
+    const adminButtons = adminMode
+      ? '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+          '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
+        '</div>'
+      : '<div class="modal-actions">' +
+          '<button class="btn btn-primary" id="closeBtn">Kapat</button>' +
+        '</div>' +
+        '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     modalContent.innerHTML =
-      '<h2>' + (index + 1) + '. Cüz</h2>' +
-      '<p class="sub">Bu cüz okunup tamamlanmış.</p>' +
+      '<h2>' + slotLabel(index) + '</h2>' +
+      '<p class="sub">Bu ' + slotNoun(index) + ' okunup tamamlanmış.</p>' +
       '<div class="taken-info">' + escapeHtml(entry.name) + ' okudu ✓<br>' +
         '<span style="color:var(--ink-soft); font-size:12.5px;">Aldı: ' + escapeHtml(entry.date) + ' · Tamamladı: ' + escapeHtml(entry.completedDate || '-') + '</span></div>' +
-      '<div class="modal-actions">' +
-        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
-        '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
-      '</div>';
+      adminButtons;
     document.getElementById('closeBtn').addEventListener('click', closeModal);
-    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
+    if (adminMode) {
+      document.getElementById('releaseBtn').addEventListener('click', releaseTile);
+    } else {
+      document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
+    }
   } else if (entry) {
     const helpBtnLabel = entry.helpRequested ? 'Yardım isteğini geri çek' : 'Yardım iste 🆘';
     const helpBtnClass = entry.helpRequested ? 'btn-ghost' : 'btn-help';
+    const actionButtons = adminMode
+      ? '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
+          '<button class="btn btn-danger" id="releaseBtn">Boşalt</button>' +
+        '</div>' +
+        '<button class="btn btn-primary" id="completeBtn" style="width:100%; margin-top:8px;">Okudum, tamamladım ✓</button>' +
+        '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>'
+      : '<div class="modal-actions">' +
+          '<button class="btn btn-primary" id="closeBtn">Kapat</button>' +
+        '</div>' +
+        '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>' +
+        '<p class="pin-hint" id="pinEditBtn" style="margin-top:16px;">PIN\'i belirle / değiştir →</p>';
     modalContent.innerHTML =
-      '<h2>' + (index + 1) + '. Cüz</h2>' +
-      '<p class="sub">Bu cüz alınmış, henüz okunduğu onaylanmadı.</p>' +
+      '<h2>' + slotLabel(index) + '</h2>' +
+      '<p class="sub">Bu ' + slotNoun(index) + ' alınmış, henüz okunduğu onaylanmadı.</p>' +
       '<div class="taken-info">' + escapeHtml(entry.name) + ' aldı.<br><span style="color:var(--ink-soft); font-size:12.5px;">Alma tarihi: ' + escapeHtml(entry.date) + '</span>' +
         (entry.helpRequested ? '<br><span style="color:#A6432D; font-weight:600; font-size:12.5px;">🆘 Yardım isteniyor</span>' : '') +
       '</div>' +
-      '<div class="modal-actions">' +
-        '<button class="btn btn-ghost" id="closeBtn">Kapat</button>' +
-        '<button class="btn btn-danger" id="releaseBtn">Vazgeçtim, boşalt</button>' +
-      '</div>' +
-      '<button class="btn btn-primary" id="completeBtn" style="width:100%; margin-top:8px;">Okudum, tamamladım ✓</button>' +
-      '<button class="btn ' + helpBtnClass + '" id="helpBtn" style="width:100%; margin-top:8px;">' + helpBtnLabel + '</button>';
+      actionButtons;
     document.getElementById('closeBtn').addEventListener('click', closeModal);
-    document.getElementById('releaseBtn').addEventListener('click', () => requestPinThenRelease(index));
-    document.getElementById('completeBtn').addEventListener('click', completeTile);
     document.getElementById('helpBtn').addEventListener('click', () => toggleHelpRequest(index));
+    if (adminMode) {
+      document.getElementById('releaseBtn').addEventListener('click', releaseTile);
+      document.getElementById('completeBtn').addEventListener('click', completeTile);
+    } else {
+      document.getElementById('pinEditBtn').addEventListener('click', () => openPinEditor(index));
+    }
   } else {
     modalContent.innerHTML =
-      '<h2>' + (index + 1) + '. Cüz</h2>' +
-      '<p class="sub">Bu cüz boş. Almak için ismini yaz.</p>' +
+      '<h2>' + slotLabel(index) + '</h2>' +
+      '<p class="sub">Bu ' + slotNoun(index) + ' boş. Almak için ismini yaz.</p>' +
       '<input type="text" id="nameInput" placeholder="İsmin" maxlength="30" autofocus>' +
       '<input type="tel" id="pinInput" placeholder="4 haneli PIN (opsiyonel)" maxlength="4" inputmode="numeric" pattern="[0-9]*">' +
       '<p class="pin-hint" id="pinHintBtn">Bu PIN ne işe yarar? →</p>' +
@@ -816,7 +857,7 @@ async function saveRound() {
   closeModal();
 }
 
-roundItem.addEventListener('click', () => requireAdminPin(openRoundEditor));
+roundItem.addEventListener('click', () => requireAdmin(openRoundEditor));
 
 // Convert DD.MM.YYYY -> YYYY-MM-DD for <input type="date">, and back
 function toDateInputValue(str) {
@@ -859,9 +900,9 @@ async function saveDate(fieldKey) {
   closeModal();
 }
 
-hatimStartItem.addEventListener('click', () => requireAdminPin(() => openDateEditor('hatimStart', 'Hatim Açılma Tarihi')));
-targetDateItem.addEventListener('click', () => requireAdminPin(() => openDateEditor('targetDate', 'Son Okuma Tarihi')));
-descriptionText.addEventListener('click', () => requireAdminPin(openDescriptionEditor));
+hatimStartItem.addEventListener('click', () => requireAdmin(() => openDateEditor('hatimStart', 'Hatim Açılma Tarihi')));
+targetDateItem.addEventListener('click', () => requireAdmin(() => openDateEditor('targetDate', 'Son Okuma Tarihi')));
+descriptionText.addEventListener('click', () => requireAdmin(openDescriptionEditor));
 
 function openDescriptionEditor() {
   modalContent.innerHTML =
@@ -893,63 +934,43 @@ async function saveDescription() {
 // --- Admin PIN gate ---
 // First use: no admin PIN set yet, so whoever clicks first sets it.
 // After that, every protected action (name, dates, description, reset) requires it.
-function requireAdminPin(onSuccess) {
-  if (!state.adminPin) {
-    modalContent.innerHTML =
-      '<h2>Yönetici PIN\'i Belirle</h2>' +
-      '<p class="sub">Bu liste için henüz bir yönetici PIN\'i yok. Turu, tarihleri, açıklamayı ve sıfırlamayı korumak için 4 haneli bir PIN belirle. Bu PIN\'i not al — sadece sen bileceksin.</p>' +
-      '<input type="tel" id="adminPinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
-      '<div class="modal-actions">' +
-        '<button class="btn btn-ghost" id="adminPinCancelBtn">Vazgeç</button>' +
-        '<button class="btn btn-primary" id="adminPinSaveBtn">PIN\'i Belirle</button>' +
-      '</div>';
-    const input = document.getElementById('adminPinInput');
-    input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4); });
-    document.getElementById('adminPinCancelBtn').addEventListener('click', closeModal);
-    document.getElementById('adminPinSaveBtn').addEventListener('click', async () => {
-      const val = input.value.trim();
-      if (!/^[0-9]{4}$/.test(val)) { showMessage('4 haneli bir PIN gir.'); return; }
-      await refetchIfPossible();
-      if (state.adminPin) {
-        // someone else set it in the meantime — ask for it instead
-        requireAdminPin(onSuccess);
-        return;
-      }
-      state.adminPin = val;
-      await saveState();
-      closeModal();
-      onSuccess();
-    });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('adminPinSaveBtn').click(); });
-    overlay.classList.add('open');
-    setTimeout(() => input.focus(), 50);
-    return;
-  }
-
+function openAdminModeModal() {
   modalContent.innerHTML =
-    '<h2>Yönetici PIN\'i</h2>' +
-    '<p class="sub">Bu değişiklik için yönetici PIN\'ini gir.</p>' +
-    '<input type="tel" id="adminPinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+    '<h2>Yönetici Modu</h2>' +
+    '<p class="sub">Yönetici şifresini gir. Açıldığında turu/tarihleri/açıklamayı değiştirebilir, herhangi bir cüzü tamamlayabilir veya boşaltabilir, sıfırlayabilirsin.</p>' +
+    '<input type="tel" id="adminPinInput" placeholder="Şifre" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
     '<div class="modal-actions">' +
       '<button class="btn btn-ghost" id="adminPinCancelBtn">Vazgeç</button>' +
-      '<button class="btn btn-primary" id="adminPinSaveBtn">Onayla</button>' +
+      '<button class="btn btn-primary" id="adminPinSaveBtn">Aç</button>' +
     '</div>';
   const input = document.getElementById('adminPinInput');
   input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4); });
   document.getElementById('adminPinCancelBtn').addEventListener('click', closeModal);
-  document.getElementById('adminPinSaveBtn').addEventListener('click', async () => {
+  document.getElementById('adminPinSaveBtn').addEventListener('click', () => {
     const val = input.value.trim();
-    await refetchIfPossible();
-    if (val !== state.adminPin && val !== MASTER_PIN) {
-      showMessage('PIN yanlış.');
+    if (val !== MASTER_PIN) {
+      showMessage('Şifre yanlış.');
       return;
     }
+    adminMode = true;
     closeModal();
-    onSuccess();
+    render();
+    showMessage('Yönetici modu açık.');
   });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('adminPinSaveBtn').click(); });
   overlay.classList.add('open');
   setTimeout(() => input.focus(), 50);
+}
+
+function disableAdminMode() {
+  adminMode = false;
+  closeModal();
+  render();
+}
+
+function requireAdmin(action) {
+  if (adminMode) { action(); return; }
+  showMessage('Bu işlem için Yönetici Modunu açman gerekiyor — Menü → Yönetici Modunu Aç.');
 }
 
 function parseDDMMYYYY(str) {
@@ -1115,7 +1136,9 @@ function shareOnWhatsApp() {
   const completedCount = state.cuzler.filter((e) => e && e.completed).length;
   const emptyNumbers = [];
   const helpNumbers = [];
+  let duaEntry = state.cuzler[CUZ_TOTAL];
   state.cuzler.forEach((entry, i) => {
+    if (i >= CUZ_TOTAL) return; // dua slot handled separately below
     if (!entry) emptyNumbers.push(i + 1);
     else if (!entry.completed && entry.helpRequested) helpNumbers.push(i + 1);
   });
@@ -1128,13 +1151,14 @@ function shareOnWhatsApp() {
   lines.push('*Son okuma tarihi:* ' + (state.targetDate || 'girilmedi'));
   lines.push('*KALAN SÜRE:* ' + getRemainingTimeCaps());
   lines.push('');
-  lines.push('*' + takenCount + ' / ' + TOTAL + '* cüz alındı, *' + completedCount + '* tamamlandı.');
+  lines.push('*' + takenCount + ' / ' + TOTAL + '* alındı (30 cüz + hatim duası), *' + completedCount + '* tamamlandı.');
   lines.push('');
   if (emptyNumbers.length > 0) {
     lines.push('*Boş cüzler:* ' + emptyNumbers.join(', '));
   } else {
     lines.push('*Boş cüz kalmadı* 🎉');
   }
+  lines.push(duaEntry ? '*Hatim Duası:* ' + duaEntry.name + ' aldı' + (duaEntry.completed ? ' ✓' : '') : '*Hatim Duası:* henüz kimse almadı');
   if (helpNumbers.length > 0) {
     lines.push('');
     lines.push('🆘 *Yardım isteyen cüzler:* ' + helpNumbers.join(', '));
@@ -1171,23 +1195,25 @@ async function claimTile() {
     return;
   }
   const pin = rawPin || null;
+  const noun = slotNoun(activeIndex);
 
   // Re-fetch latest state to avoid overwriting someone else's claim
   await refetchIfPossible();
   if (state.cuzler[activeIndex]) {
     // someone else claimed it in the meantime
     render();
-    showMessage('Bu cüz az önce başka biri tarafından alındı.');
+    showMessage('Bu ' + noun + ' az önce başka biri tarafından alındı.');
     return;
   }
   state.cuzler[activeIndex] = { name: name, date: todayStr(), completed: false, completedDate: null, pin: pin, helpRequested: false };
   await saveState();
   render();
   closeModal();
+  const nounCap = noun.charAt(0).toUpperCase() + noun.slice(1);
   if (pin) {
-    showMessage('Cüz senin oldu! PIN\'in: ' + pin + ' — boşaltmak istediğinde bu PIN\'i gireceksin, not almayı unutma.');
+    showMessage(nounCap + ' senin oldu! PIN\'in: ' + pin + ' — dilersen sonra değiştirebilirsin.');
   } else {
-    showMessage('Cüz senin oldu! PIN belirlemediğin için bu cüzü herkes boşaltabilir.');
+    showMessage(nounCap + ' senin oldu!');
   }
 }
 
@@ -1221,48 +1247,58 @@ async function releaseTile() {
   closeModal();
 }
 
-async function requestPinThenRelease(index) {
-  await refetchIfPossible();
+function openPinEditor(index) {
   const entry = state.cuzler[index];
-  if (!entry) { render(); closeModal(); return; }
-
-  if (!entry.pin) {
-    // Legacy entry with no PIN set — allow direct release
-    releaseTile();
-    return;
+  if (!entry) { closeModal(); return; }
+  if (entry.pin) {
+    modalContent.innerHTML =
+      '<h2>PIN Değiştir</h2>' +
+      '<p class="sub">Mevcut PIN\'ini gir, sonra yeni PIN belirle.</p>' +
+      '<input type="tel" id="curPinInput" placeholder="Mevcut PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+      '<input type="tel" id="newPinInput" placeholder="Yeni PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*">' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="pinEditCancelBtn">Vazgeç</button>' +
+        '<button class="btn btn-primary" id="pinEditSaveBtn">Kaydet</button>' +
+      '</div>';
+  } else {
+    modalContent.innerHTML =
+      '<h2>PIN Belirle</h2>' +
+      '<p class="sub">Bu cüz için 4 haneli bir PIN belirle. Not: bu PIN artık cüzü boşaltmak için kullanılmıyor, boşaltma/tamamlama işlemleri yönetici tarafından yapılıyor.</p>' +
+      '<input type="tel" id="newPinInput" placeholder="Yeni PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="pinEditCancelBtn">Vazgeç</button>' +
+        '<button class="btn btn-primary" id="pinEditSaveBtn">Kaydet</button>' +
+      '</div>';
   }
-
-  modalContent.innerHTML =
-    '<h2>PIN Gerekli</h2>' +
-    '<p class="sub">Bu cüzü boşaltmak için ' + escapeHtml(entry.name) + '\'in belirlediği 4 haneli PIN\'i gir.</p>' +
-    '<input type="tel" id="releasePinInput" placeholder="4 haneli PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
-    '<div class="modal-actions">' +
-      '<button class="btn btn-ghost" id="pinCancelBtn">Vazgeç</button>' +
-      '<button class="btn btn-danger" id="pinConfirmBtn">Boşalt</button>' +
-    '</div>';
-  const pinInput = document.getElementById('releasePinInput');
-  pinInput.addEventListener('input', () => {
-    pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+  modalContent.querySelectorAll('#curPinInput, #newPinInput').forEach((el) => {
+    el.addEventListener('input', () => { el.value = el.value.replace(/[^0-9]/g, '').slice(0, 4); });
   });
-  document.getElementById('pinCancelBtn').addEventListener('click', closeModal);
-  document.getElementById('pinConfirmBtn').addEventListener('click', () => checkReleasePin(index));
-  pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkReleasePin(index); });
+  document.getElementById('pinEditCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('pinEditSaveBtn').addEventListener('click', () => savePinEdit(index));
   overlay.classList.add('open');
-  setTimeout(() => pinInput.focus(), 50);
+  setTimeout(() => document.getElementById(entry.pin ? 'curPinInput' : 'newPinInput').focus(), 50);
 }
 
-async function checkReleasePin(index) {
-  const pinInput = document.getElementById('releasePinInput');
-  const entered = pinInput.value.trim();
+async function savePinEdit(index) {
+  const newPinInput = document.getElementById('newPinInput');
+  const newPin = newPinInput.value.trim();
+  if (!/^[0-9]{4}$/.test(newPin)) { showMessage('Yeni PIN 4 haneli olmalı.'); return; }
   await refetchIfPossible();
   const entry = state.cuzler[index];
   if (!entry) { render(); closeModal(); return; }
-  if (entered !== entry.pin && entered !== MASTER_PIN) {
-    showMessage('PIN yanlış. Bu cüzü yalnızca doğru PIN\'i bilen kişi boşaltabilir.');
-    return;
+  if (entry.pin) {
+    const curPinInput = document.getElementById('curPinInput');
+    const curPin = curPinInput.value.trim();
+    if (curPin !== entry.pin && curPin !== MASTER_PIN) {
+      showMessage('Mevcut PIN yanlış.');
+      return;
+    }
   }
-  activeIndex = index;
-  releaseTile();
+  entry.pin = newPin;
+  await saveState();
+  render();
+  closeModal();
+  showMessage('PIN güncellendi.');
 }
 
 function resetAll() {
@@ -1286,22 +1322,57 @@ function resetAll() {
   });
 }
 
+function startNewHatim() {
+  showConfirm('Mevcut hatim arşive kaydedilip liste tamamen sıfırlanacak, sonra yeni hatimin ismini gireceksin. Emin misin?', async () => {
+    await refetchIfPossible();
+    const takenCount = state.cuzler.filter(Boolean).length;
+    const completedCount = state.cuzler.filter((e) => e && e.completed).length;
+    if (!state.archive) state.archive = [];
+    if (takenCount > 0 || state.hatimName) {
+      state.archive.unshift({
+        hatimName: state.hatimName || 'Hatim',
+        hatimStart: state.hatimStart,
+        targetDate: state.targetDate,
+        archivedDate: todayStr(),
+        takenCount: takenCount,
+        completedCount: completedCount,
+        cuzler: state.cuzler
+      });
+    }
+    state.cuzler = new Array(TOTAL).fill(null);
+    state.hatimName = '';
+    state.hatimStart = null;
+    state.targetDate = null;
+    await saveState();
+    render();
+    openRoundEditor();
+  });
+}
+
 function openMainMenu() {
+  const adminToggleLabel = adminMode ? 'Yönetici Modunu Kapat 🔓' : 'Yönetici Modunu Aç 🔒';
+  const adminToggleClass = adminMode ? 'btn-help' : 'btn-ghost';
   modalContent.innerHTML =
     '<h2>Menü</h2>' +
+    '<button class="btn ' + adminToggleClass + '" id="menuAdminToggle" style="width:100%; margin-bottom:8px;">' + adminToggleLabel + '</button>' +
     '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
     '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
     '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
     '<button class="btn btn-ghost" id="menuArchive" style="width:100%; margin-bottom:8px;">Geçmiş hatimler</button>' +
-    '<button class="btn btn-danger" id="menuReset" style="width:100%;">Sıfırla</button>' +
+    '<button class="btn btn-help" id="menuNewHatim" style="width:100%; margin-bottom:8px;">Yeni Hatim Ekle</button>' +
+    '<button class="btn btn-danger" id="menuReset" style="width:100%;">Bu Hatimi Sıfırla</button>' +
     '<div class="modal-actions" style="margin-top:12px;">' +
       '<button class="btn btn-ghost" id="menuCloseBtn">Kapat</button>' +
     '</div>';
+  document.getElementById('menuAdminToggle').addEventListener('click', () => {
+    if (adminMode) { disableAdminMode(); } else { openAdminModeModal(); }
+  });
   document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
   document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
   document.getElementById('menuQr').addEventListener('click', openQrModal);
   document.getElementById('menuArchive').addEventListener('click', openArchiveList);
-  document.getElementById('menuReset').addEventListener('click', () => requireAdminPin(resetAll));
+  document.getElementById('menuNewHatim').addEventListener('click', () => requireAdmin(startNewHatim));
+  document.getElementById('menuReset').addEventListener('click', () => requireAdmin(resetAll));
   document.getElementById('menuCloseBtn').addEventListener('click', closeModal);
   overlay.classList.add('open');
 }
