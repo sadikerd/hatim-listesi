@@ -15,6 +15,6 @@ Bu proje sadece Harmonie31 üyeleri arasında dahili kullanım içindir.
 ## Version
 - 1.0
 - 2.0 admin modu eklendi
-- 2.1 
+- 2.1 "Boşalt" ve "Okudum" artık herkese görünür olacak
 ---
 Firebase (Firestore) + statik HTML/JS ile çalışır, GitHub Pages üzerinde barındırılır.
