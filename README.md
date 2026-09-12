@@ -2,6 +2,8 @@
 
 Association Harmonie31 bünyesinde düzenlenen hatimler için cüz dağılım ve takip uygulaması.
 
+🔗 **Canlı site:** https://sadikerd.github.io/hatim-listesi/
+
 ## Ne işe yarar?
 - 30 cüzü listeler, herkes boş bir cüzü alıp okuyabilir
 - Alınan cüzler PIN korumalı, yanlışlıkla/kasıtlı boşaltılamaz
