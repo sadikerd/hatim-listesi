@@ -540,8 +540,12 @@ function stateDocRef() {
 
 const CUZ_TOTAL = 30;
 const TOTAL = 31; // 30 cüz + 1 hatim duası
-// state = { hatimName, hatimStart, targetDate, description, adminPin, archive: [...], cuzler: [{name, date, completed, completedDate, pin, helpRequested}|null, ...30] }
+
+// state = { hatims: [ { id, hatimName, hatimStart, targetDate, description, createdDate,
+//   cuzler: [{name, date, completed, completedDate, pin, helpRequested}|null, ...31] }, ... ] }
+// En üstteki (index 0) en son oluşturulan hatimdir; ekranda varsayılan olarak o gösterilir.
 let state = null;
+let selectedHatimId = null; // sadece bu tarayıcıda geçerli — hangi hatime bakıldığını belirler, Firestore'a yazılmaz
 let activeIndex = null;
 
 const gridEl = document.getElementById('grid');
@@ -579,8 +583,86 @@ function todayStr() {
   return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
 }
 
+function genId() {
+  return 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function freshHatim(name) {
+  return {
+    id: genId(),
+    hatimName: name || '1. Hatim',
+    hatimStart: null,
+    targetDate: null,
+    description: 'Boş bir cüze dokunup ismini yaz, senin olsun.',
+    createdDate: todayStr(),
+    cuzler: new Array(TOTAL).fill(null)
+  };
+}
+
 function freshState() {
-  return { hatimName: '1. Hatim', hatimStart: null, targetDate: null, description: 'Boş bir cüze dokunup ismini yaz, senin olsun.', archive: [], cuzler: new Array(TOTAL).fill(null) };
+  return { hatims: [freshHatim('1. Hatim')] };
+}
+
+// Eski (tek hatim + archive) veri şeklinden yeni (hatims listesi) şekle geçiş.
+// Firestore'da hâlâ eski şekilde veri varsa otomatik dönüştürülür.
+function migrateIfNeeded(raw) {
+  if (raw && Array.isArray(raw.hatims)) return raw;
+  const hatims = [];
+  hatims.push({
+    id: genId(),
+    hatimName: raw.hatimName || '1. Hatim',
+    hatimStart: raw.hatimStart || null,
+    targetDate: raw.targetDate || null,
+    description: raw.description || 'Boş bir cüze dokunup ismini yaz, senin olsun.',
+    createdDate: raw.hatimStart || todayStr(),
+    cuzler: raw.cuzler || new Array(TOTAL).fill(null)
+  });
+  (raw.archive || []).forEach((a) => {
+    if (!a) return;
+    hatims.push({
+      id: genId(),
+      hatimName: a.hatimName || 'Hatim',
+      hatimStart: a.hatimStart || null,
+      targetDate: a.targetDate || null,
+      description: 'Boş bir cüze dokunup ismini yaz, senin olsun.',
+      createdDate: a.archivedDate || todayStr(),
+      cuzler: a.cuzler || new Array(TOTAL).fill(null)
+    });
+  });
+  return { hatims: hatims };
+}
+
+// Elle (Firestore konsolundan) yapılan silme/düzenlemeler veriyi eksik/bozuk bırakabilir.
+// Bu fonksiyon, her hatimin geçerli bir 31 elemanlı cüz listesine sahip olmasını garanti eder,
+// mevcut verileri koruyarak eksik olanları tamamlar — hiçbir zaman çökmeyi engeller.
+function sanitizeState(s) {
+  if (!s || !Array.isArray(s.hatims) || s.hatims.length === 0) {
+    return { hatims: [freshHatim('1. Hatim')] };
+  }
+  s.hatims.forEach((h) => {
+    if (!h.id) h.id = genId();
+    if (typeof h.hatimName !== 'string') h.hatimName = '';
+    if (!Array.isArray(h.cuzler) || h.cuzler.length !== TOTAL) {
+      const old = Array.isArray(h.cuzler) ? h.cuzler : [];
+      const fixed = new Array(TOTAL).fill(null);
+      for (let i = 0; i < Math.min(old.length, TOTAL); i++) fixed[i] = old[i] || null;
+      h.cuzler = fixed;
+    }
+  });
+  return s;
+}
+
+function getSelectedHatim() {
+  if (!state) return null;
+  if (!state.hatims || state.hatims.length === 0) {
+    state.hatims = [freshHatim('1. Hatim')];
+  }
+  let h = state.hatims.find((x) => x.id === selectedHatimId);
+  if (!h) {
+    h = state.hatims[0];
+    selectedHatimId = h.id;
+  }
+  return h;
 }
 
 async function loadState() {
@@ -594,8 +676,8 @@ async function loadState() {
   try {
     const snap = await getDoc(stateDocRef());
     if (snap.exists()) {
-      state = snap.data();
-      if (!state.archive) state.archive = [];
+      state = sanitizeState(migrateIfNeeded(snap.data()));
+      await saveState(); // migration sonrası yeni şekli kaydet (zararsızsa tekrar aynı şeyi yazar)
     } else {
       state = freshState();
       await setDoc(stateDocRef(), state);
@@ -605,7 +687,11 @@ async function loadState() {
     state = freshState();
     progressLabel.textContent = 'Firebase\'e bağlanılamadı — ayarları ve Firestore kurallarını kontrol et.';
   }
-  render();
+  try {
+    render();
+  } catch (e) {
+    progressLabel.textContent = 'Bir hata oluştu: ' + e.message + ' — sayfayı yenile.';
+  }
 
   // Canlı senkronizasyon: biri bir değişiklik yaptığında herkesin ekranı otomatik güncellenir.
   if (firebaseReady) {
@@ -613,9 +699,8 @@ async function loadState() {
       onSnapshot(stateDocRef(), (snap) => {
         if (!snap.exists()) return;
         if (overlay.classList.contains('open')) return; // açık bir pencere varken üzerine yazma
-        state = snap.data();
-        if (!state.archive) state.archive = [];
-        render();
+        state = sanitizeState(migrateIfNeeded(snap.data()));
+        try { render(); } catch (e) { /* sonraki güncellemede düzelir */ }
       });
     } catch (e) { /* canlı senkronizasyon başlatılamadı, sorun değil */ }
   }
@@ -631,8 +716,23 @@ async function saveState() {
   }
 }
 
+async function refetchIfPossible() {
+  if (!storageOk || !firebaseReady) return;
+  try {
+    const snap = await getDoc(stateDocRef());
+    if (snap.exists()) {
+      state = sanitizeState(migrateIfNeeded(snap.data()));
+    }
+  } catch (e) { /* keep local state if refetch fails */ }
+}
+
 function render() {
-  const cuzler = state.cuzler;
+  const h = getSelectedHatim();
+  if (!h) {
+    progressLabel.textContent = 'Veri yüklenemedi — sayfayı yenile. Sorun sürerse Firebase ayarlarını kontrol et.';
+    return;
+  }
+  const cuzler = h.cuzler;
   const takenCount = cuzler.filter(Boolean).length;
   const completedCount = cuzler.filter((e) => e && e.completed).length;
   progressFill.style.width = (takenCount / TOTAL * 100) + '%';
@@ -640,10 +740,10 @@ function render() {
   footNote.textContent = adminMode
     ? '🔓 Yönetici modu açık — isim, tarih, açıklama değiştirilebilir; cüzler tamamlanabilir/boşaltılabilir.'
     : 'Bu liste herkese açık — burada kim neyi aldığını görebilir.';
-  roundValue.textContent = state.hatimName || 'Girilmedi';
-  hatimStartValue.textContent = state.hatimStart || 'Girilmedi';
-  targetDateValue.textContent = state.targetDate || 'Girilmedi';
-  descriptionText.textContent = state.description || 'Boş bir cüze dokunup ismini yaz, senin olsun.';
+  roundValue.textContent = h.hatimName || 'Girilmedi';
+  hatimStartValue.textContent = h.hatimStart || 'Girilmedi';
+  targetDateValue.textContent = h.targetDate || 'Girilmedi';
+  descriptionText.textContent = h.description || 'Boş bir cüze dokunup ismini yaz, senin olsun.';
   menuBtn.textContent = adminMode ? '☰ Menü 🔓' : '☰ Menü';
   updateCountdown();
 
@@ -687,7 +787,8 @@ function escapeHtml(str) {
 
 function openModal(index) {
   activeIndex = index;
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (entry && entry.completed) {
     modalContent.innerHTML =
       '<h2>' + slotLabel(index) + '</h2>' +
@@ -813,10 +914,11 @@ function showPinExplanation() {
 }
 
 function openRoundEditor() {
+  const h = getSelectedHatim();
   modalContent.innerHTML =
     '<h2>Hatim Adı</h2>' +
     '<p class="sub">Bu hatime bir isim ver.</p>' +
-    '<input type="text" id="roundInput" value="' + escapeHtml(state.hatimName || '') + '" maxlength="40" placeholder="Örn: 23. Hatim, Ramazan Hatimi" autofocus>' +
+    '<input type="text" id="roundInput" value="' + escapeHtml(h.hatimName || '') + '" maxlength="40" placeholder="Örn: 23. Hatim, Ramazan Hatimi" autofocus>' +
     '<div class="modal-actions">' +
       '<button class="btn btn-ghost" id="roundCancelBtn">Vazgeç</button>' +
       '<button class="btn btn-primary" id="roundSaveBtn">Kaydet</button>' +
@@ -834,7 +936,8 @@ async function saveRound() {
   const val = input.value.trim();
   if (!val) { showMessage('Bir hatim adı yaz.'); return; }
   await refetchIfPossible();
-  state.hatimName = val;
+  const h = getSelectedHatim();
+  h.hatimName = val;
   await saveState();
   render();
   closeModal();
@@ -845,20 +948,21 @@ roundItem.addEventListener('click', () => requireAdmin(openRoundEditor));
 // Convert DD.MM.YYYY -> YYYY-MM-DD for <input type="date">, and back
 function toDateInputValue(str) {
   if (!str) return '';
-  const cuzler = str.split('.');
-  if (cuzler.length !== 3) return '';
-  return cuzler[2] + '-' + cuzler[1] + '-' + cuzler[0];
+  const parts = str.split('.');
+  if (parts.length !== 3) return '';
+  return parts[2] + '-' + parts[1] + '-' + parts[0];
 }
 
 function fromDateInputValue(str) {
   if (!str) return null;
-  const cuzler = str.split('-');
-  if (cuzler.length !== 3) return null;
-  return cuzler[2] + '.' + cuzler[1] + '.' + cuzler[0];
+  const parts = str.split('-');
+  if (parts.length !== 3) return null;
+  return parts[2] + '.' + parts[1] + '.' + parts[0];
 }
 
 function openDateEditor(fieldKey, label) {
-  const current = toDateInputValue(state[fieldKey]);
+  const h = getSelectedHatim();
+  const current = toDateInputValue(h[fieldKey]);
   modalContent.innerHTML =
     '<h2>' + escapeHtml(label) + '</h2>' +
     '<p class="sub">Tarihi elle seç.</p>' +
@@ -877,7 +981,8 @@ async function saveDate(fieldKey) {
   const val = fromDateInputValue(input.value);
   if (!val) { showMessage('Geçerli bir tarih seç.'); return; }
   await refetchIfPossible();
-  state[fieldKey] = val;
+  const h = getSelectedHatim();
+  h[fieldKey] = val;
   await saveState();
   render();
   closeModal();
@@ -888,10 +993,11 @@ targetDateItem.addEventListener('click', () => requireAdmin(() => openDateEditor
 descriptionText.addEventListener('click', () => requireAdmin(openDescriptionEditor));
 
 function openDescriptionEditor() {
+  const h = getSelectedHatim();
   modalContent.innerHTML =
     '<h2>Açıklama</h2>' +
     '<p class="sub">Sayfanın üstünde görünen açıklama metnini düzenle.</p>' +
-    '<input type="text" id="descInput" value="' + escapeHtml(state.description || '') + '" maxlength="120" autofocus>' +
+    '<input type="text" id="descInput" value="' + escapeHtml(h.description || '') + '" maxlength="120" autofocus>' +
     '<div class="modal-actions">' +
       '<button class="btn btn-ghost" id="descCancelBtn">Vazgeç</button>' +
       '<button class="btn btn-primary" id="descSaveBtn">Kaydet</button>' +
@@ -908,19 +1014,18 @@ async function saveDescription() {
   const input = document.getElementById('descInput');
   const val = input.value.trim();
   await refetchIfPossible();
-  state.description = val;
+  const h = getSelectedHatim();
+  h.description = val;
   await saveState();
   render();
   closeModal();
 }
 
-// --- Admin PIN gate ---
-// First use: no admin PIN set yet, so whoever clicks first sets it.
-// After that, every protected action (name, dates, description, reset) requires it.
+// --- Yönetici Modu ---
 function openAdminModeModal() {
   modalContent.innerHTML =
     '<h2>Yönetici Modu</h2>' +
-    '<p class="sub">Yönetici şifresini gir. Açıldığında turu/tarihleri/açıklamayı değiştirebilir, herhangi bir cüzü tamamlayabilir veya boşaltabilir, sıfırlayabilirsin.</p>' +
+    '<p class="sub">Yönetici şifresini gir. Açıldığında ismi/tarihleri/açıklamayı değiştirebilir, yeni hatim oluşturabilir ve bu hatimi sıfırlayabilirsin.</p>' +
     '<input type="tel" id="adminPinInput" placeholder="Şifre" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
     '<div class="modal-actions">' +
       '<button class="btn btn-ghost" id="adminPinCancelBtn">Vazgeç</button>' +
@@ -958,10 +1063,10 @@ function requireAdmin(action) {
 
 function parseDDMMYYYY(str) {
   if (!str) return null;
-  const cuzler = str.split('.');
-  if (cuzler.length !== 3) return null;
+  const parts = str.split('.');
+  if (parts.length !== 3) return null;
   // Target is due by end of that day
-  return new Date(parseInt(cuzler[2], 10), parseInt(cuzler[1], 10) - 1, parseInt(cuzler[0], 10), 23, 59, 59);
+  return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 23, 59, 59);
 }
 
 function updateCountdown() {
@@ -971,7 +1076,8 @@ function updateCountdown() {
 }
 
 function renderCountdownNow() {
-  const target = parseDDMMYYYY(state.targetDate);
+  const h = getSelectedHatim();
+  const target = parseDDMMYYYY(h.targetDate);
   if (!target) {
     countdownBanner.textContent = 'Son okuma tarihi belirlenmedi — üstteki alana dokunup ekleyebilirsin.';
     countdownBanner.className = 'countdown-banner empty';
@@ -982,7 +1088,7 @@ function renderCountdownNow() {
   const now = new Date();
   const diffMs = target - now;
   if (diffMs <= 0) {
-    countdownBanner.textContent = 'Son okuma tarihi geçti (' + state.targetDate + ')';
+    countdownBanner.textContent = 'Son okuma tarihi geçti (' + h.targetDate + ')';
     countdownBanner.className = 'countdown-banner overdue';
     return;
   }
@@ -998,8 +1104,9 @@ function renderCountdownNow() {
 }
 
 function openWhoTook() {
+  const h = getSelectedHatim();
   const counts = {};
-  state.cuzler.forEach((entry) => {
+  h.cuzler.forEach((entry) => {
     if (!entry) return;
     if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
     counts[entry.name].total++;
@@ -1040,66 +1147,45 @@ function openQrModal() {
   overlay.classList.add('open');
 }
 
-
-function openArchiveList() {
-  const archive = state.archive || [];
+// --- Hatim Listesi: birden fazla hatim arasında geçiş ---
+function openHatimList() {
+  const hatims = state.hatims || [];
   let listHtml;
-  if (archive.length === 0) {
-    listHtml = '<p class="sub">Henüz arşivlenmiş bir hatim yok. Sıfırladığında o hatim buraya kaydedilir.</p>';
+  if (hatims.length === 0) {
+    listHtml = '<p class="sub">Henüz hiç hatim yok.</p>';
   } else {
     listHtml = '<ul class="who-took-list">' +
-      archive.map((h, i) =>
-        '<li style="cursor:pointer;" data-idx="' + i + '"><span>' + escapeHtml(h.hatimName) + '</span>' +
-        '<span class="count">' + h.completedCount + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.archivedDate) + '</span></li>'
-      ).join('') +
+      hatims.map((h) => {
+        const completed = h.cuzler.filter((e) => e && e.completed).length;
+        const isSelected = h.id === selectedHatimId;
+        return '<li style="cursor:pointer;' + (isSelected ? ' font-weight:700;' : '') + '" data-id="' + h.id + '">' +
+          '<span>' + (isSelected ? '● ' : '') + escapeHtml(h.hatimName || 'Hatim') + '</span>' +
+          '<span class="count">' + completed + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.createdDate || '') + '</span>' +
+          '</li>';
+      }).join('') +
       '</ul>';
   }
   modalContent.innerHTML =
-    '<h2>Geçmiş Hatimler</h2>' +
+    '<h2>Hatim Listesi</h2>' +
+    '<p class="sub">Görüntülemek istediğin hatime dokun.</p>' +
     listHtml +
     '<div class="modal-actions">' +
-      '<button class="btn btn-primary" id="archiveCloseBtn">Kapat</button>' +
+      '<button class="btn btn-primary" id="hatimListCloseBtn">Kapat</button>' +
     '</div>';
-  document.getElementById('archiveCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('hatimListCloseBtn').addEventListener('click', closeModal);
   modalContent.querySelectorAll('.who-took-list li').forEach((li) => {
-    li.addEventListener('click', () => openArchiveDetail(parseInt(li.getAttribute('data-idx'), 10)));
+    li.addEventListener('click', () => {
+      selectedHatimId = li.getAttribute('data-id');
+      closeModal();
+      render();
+    });
   });
   overlay.classList.add('open');
 }
-
-function openArchiveDetail(idx) {
-  const h = (state.archive || [])[idx];
-  if (!h) { openArchiveList(); return; }
-  const counts = {};
-  (h.cuzler || []).forEach((entry) => {
-    if (!entry) return;
-    if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
-    counts[entry.name].total++;
-    if (entry.completed) counts[entry.name].completed++;
-  });
-  const names = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total || a.localeCompare(b));
-  const peopleHtml = names.length === 0
-    ? '<p class="sub">Kayıtlı kişi yok.</p>'
-    : '<ul class="who-took-list">' +
-        names.map((n) => '<li><span>' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
-      '</ul>';
-  modalContent.innerHTML =
-    '<h2>' + escapeHtml(h.hatimName) + '</h2>' +
-    '<p class="sub">Açılış: ' + escapeHtml(h.hatimStart || '—') + ' · Bitiş: ' + escapeHtml(h.archivedDate) + '<br>' +
-      h.completedCount + ' / ' + TOTAL + ' cüz okunmuş (' + h.takenCount + ' alınmıştı).</p>' +
-    peopleHtml +
-    '<div class="modal-actions">' +
-      '<button class="btn btn-ghost" id="archiveBackBtn">Geri</button>' +
-      '<button class="btn btn-primary" id="archiveDetailCloseBtn">Kapat</button>' +
-    '</div>';
-  document.getElementById('archiveBackBtn').addEventListener('click', openArchiveList);
-  document.getElementById('archiveDetailCloseBtn').addEventListener('click', closeModal);
-  overlay.classList.add('open');
-}
-
 
 function getRemainingTimeCaps() {
-  const target = parseDDMMYYYY(state.targetDate);
+  const h = getSelectedHatim();
+  const target = parseDDMMYYYY(h.targetDate);
   if (!target) return 'BELİRLENMEDİ';
   const now = new Date();
   const diffMs = target - now;
@@ -1115,12 +1201,13 @@ function getRemainingTimeCaps() {
 }
 
 function shareOnWhatsApp() {
-  const takenCount = state.cuzler.filter(Boolean).length;
-  const completedCount = state.cuzler.filter((e) => e && e.completed).length;
+  const h = getSelectedHatim();
+  const takenCount = h.cuzler.filter(Boolean).length;
+  const completedCount = h.cuzler.filter((e) => e && e.completed).length;
   const emptyNumbers = [];
   const helpNumbers = [];
-  let duaEntry = state.cuzler[CUZ_TOTAL];
-  state.cuzler.forEach((entry, i) => {
+  let duaEntry = h.cuzler[CUZ_TOTAL];
+  h.cuzler.forEach((entry, i) => {
     if (i >= CUZ_TOTAL) return; // dua slot handled separately below
     if (!entry) emptyNumbers.push(i + 1);
     else if (!entry.completed && entry.helpRequested) helpNumbers.push(i + 1);
@@ -1128,10 +1215,10 @@ function shareOnWhatsApp() {
   const url = window.location.href;
 
   const lines = [];
-  lines.push('*' + (state.hatimName || 'Hatim') + '*' + ' için cüz paylaşımı 🌙');
+  lines.push('*' + (h.hatimName || 'Hatim') + '*' + ' için cüz paylaşımı 🌙');
   lines.push('');
-  lines.push('*Hatim açılma tarihi:* ' + (state.hatimStart || 'girilmedi'));
-  lines.push('*Son okuma tarihi:* ' + (state.targetDate || 'girilmedi'));
+  lines.push('*Hatim açılma tarihi:* ' + (h.hatimStart || 'girilmedi'));
+  lines.push('*Son okuma tarihi:* ' + (h.targetDate || 'girilmedi'));
   lines.push('*KALAN SÜRE:* ' + getRemainingTimeCaps());
   lines.push('');
   lines.push('*' + takenCount + ' / ' + TOTAL + '* alındı (30 cüz + hatim duası), *' + completedCount + '* tamamlandı.');
@@ -1155,18 +1242,6 @@ function shareOnWhatsApp() {
   window.open(waUrl, '_blank');
 }
 
-
-async function refetchIfPossible() {
-  if (!storageOk || !firebaseReady) return;
-  try {
-    const snap = await getDoc(stateDocRef());
-    if (snap.exists()) {
-      state = snap.data();
-      if (!state.archive) state.archive = [];
-    }
-  } catch (e) { /* keep local state if refetch fails */ }
-}
-
 async function claimTile() {
   const input = document.getElementById('nameInput');
   const pinInput = document.getElementById('pinInput');
@@ -1182,13 +1257,14 @@ async function claimTile() {
 
   // Re-fetch latest state to avoid overwriting someone else's claim
   await refetchIfPossible();
-  if (state.cuzler[activeIndex]) {
+  const h = getSelectedHatim();
+  if (h.cuzler[activeIndex]) {
     // someone else claimed it in the meantime
     render();
     showMessage('Bu ' + noun + ' az önce başka biri tarafından alındı.');
     return;
   }
-  state.cuzler[activeIndex] = { name: name, date: todayStr(), completed: false, completedDate: null, pin: pin, helpRequested: false };
+  h.cuzler[activeIndex] = { name: name, date: todayStr(), completed: false, completedDate: null, pin: pin, helpRequested: false };
   await saveState();
   render();
   closeModal();
@@ -1202,7 +1278,8 @@ async function claimTile() {
 
 async function completeTile() {
   await refetchIfPossible();
-  const entry = state.cuzler[activeIndex];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[activeIndex];
   if (!entry) { render(); closeModal(); return; }
   entry.completed = true;
   entry.completedDate = todayStr();
@@ -1214,7 +1291,8 @@ async function completeTile() {
 
 async function toggleHelpRequest(index) {
   await refetchIfPossible();
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (!entry) { render(); closeModal(); return; }
   entry.helpRequested = !entry.helpRequested;
   await saveState();
@@ -1224,7 +1302,8 @@ async function toggleHelpRequest(index) {
 
 async function releaseTile() {
   await refetchIfPossible();
-  state.cuzler[activeIndex] = null;
+  const h = getSelectedHatim();
+  h.cuzler[activeIndex] = null;
   await saveState();
   render();
   closeModal();
@@ -1232,7 +1311,8 @@ async function releaseTile() {
 
 async function requestPinThenRelease(index) {
   await refetchIfPossible();
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (!entry) { render(); closeModal(); return; }
 
   if (!entry.pin) {
@@ -1265,7 +1345,8 @@ async function checkReleasePin(index) {
   const pinInput = document.getElementById('releasePinInput');
   const entered = pinInput.value.trim();
   await refetchIfPossible();
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (!entry) { render(); closeModal(); return; }
   if (entered !== entry.pin && entered !== MASTER_PIN) {
     showMessage('PIN yanlış. Bu ' + slotNoun(index) + ' yalnızca doğru PIN\'i bilen kişi tarafından boşaltılabilir.');
@@ -1276,7 +1357,8 @@ async function checkReleasePin(index) {
 }
 
 function openPinEditor(index) {
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (!entry) { closeModal(); return; }
   if (entry.pin) {
     modalContent.innerHTML =
@@ -1291,7 +1373,7 @@ function openPinEditor(index) {
   } else {
     modalContent.innerHTML =
       '<h2>PIN Belirle</h2>' +
-      '<p class="sub">Bu cüz için 4 haneli bir PIN belirle. Not: bu PIN artık cüzü boşaltmak için kullanılmıyor, boşaltma/tamamlama işlemleri yönetici tarafından yapılıyor.</p>' +
+      '<p class="sub">Bu cüz için 4 haneli bir PIN belirle.</p>' +
       '<input type="tel" id="newPinInput" placeholder="Yeni PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autofocus>' +
       '<div class="modal-actions">' +
         '<button class="btn btn-ghost" id="pinEditCancelBtn">Vazgeç</button>' +
@@ -1312,7 +1394,8 @@ async function savePinEdit(index) {
   const newPin = newPinInput.value.trim();
   if (!/^[0-9]{4}$/.test(newPin)) { showMessage('Yeni PIN 4 haneli olmalı.'); return; }
   await refetchIfPossible();
-  const entry = state.cuzler[index];
+  const h = getSelectedHatim();
+  const entry = h.cuzler[index];
   if (!entry) { render(); closeModal(); return; }
   if (entry.pin) {
     const curPinInput = document.getElementById('curPinInput');
@@ -1330,47 +1413,22 @@ async function savePinEdit(index) {
 }
 
 function resetAll() {
-  showConfirm('Tüm liste boşaltılacak ve bu hatim arşive kaydedilecek. Emin misin?', async () => {
+  showConfirm('Bu hatimin cüz listesi tamamen boşaltılacak (isim ve tarihler kalacak). Emin misin?', async () => {
     await refetchIfPossible();
-    const takenCount = state.cuzler.filter(Boolean).length;
-    const completedCount = state.cuzler.filter((e) => e && e.completed).length;
-    if (!state.archive) state.archive = [];
-    state.archive.unshift({
-      hatimName: state.hatimName || 'Hatim',
-      hatimStart: state.hatimStart,
-      targetDate: state.targetDate,
-      archivedDate: todayStr(),
-      takenCount: takenCount,
-      completedCount: completedCount,
-      cuzler: state.cuzler
-    });
-    state.cuzler = new Array(TOTAL).fill(null);
+    const h = getSelectedHatim();
+    h.cuzler = new Array(TOTAL).fill(null);
     await saveState();
     render();
   });
 }
 
 function startNewHatim() {
-  showConfirm('Mevcut hatim arşive kaydedilip liste tamamen sıfırlanacak, sonra yeni hatimin ismini gireceksin. Emin misin?', async () => {
+  showConfirm('Yeni bir hatim oluşturulacak ve ekrana o gelecek. Mevcut hatim silinmez, listede kalır. Emin misin?', async () => {
     await refetchIfPossible();
-    const takenCount = state.cuzler.filter(Boolean).length;
-    const completedCount = state.cuzler.filter((e) => e && e.completed).length;
-    if (!state.archive) state.archive = [];
-    if (takenCount > 0 || state.hatimName) {
-      state.archive.unshift({
-        hatimName: state.hatimName || 'Hatim',
-        hatimStart: state.hatimStart,
-        targetDate: state.targetDate,
-        archivedDate: todayStr(),
-        takenCount: takenCount,
-        completedCount: completedCount,
-        cuzler: state.cuzler
-      });
-    }
-    state.cuzler = new Array(TOTAL).fill(null);
-    state.hatimName = '';
-    state.hatimStart = null;
-    state.targetDate = null;
+    if (!state.hatims) state.hatims = [];
+    const newHatim = freshHatim('');
+    state.hatims.unshift(newHatim);
+    selectedHatimId = newHatim.id;
     await saveState();
     render();
     openRoundEditor();
@@ -1386,7 +1444,7 @@ function openMainMenu() {
     '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
     '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
     '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
-    '<button class="btn btn-ghost" id="menuArchive" style="width:100%; margin-bottom:8px;">Geçmiş hatimler</button>' +
+    '<button class="btn btn-ghost" id="menuHatimList" style="width:100%; margin-bottom:8px;">Hatim Listesi</button>' +
     '<button class="btn btn-help" id="menuNewHatim" style="width:100%; margin-bottom:8px;">Yeni Hatim Ekle</button>' +
     '<button class="btn btn-danger" id="menuReset" style="width:100%;">Bu Hatimi Sıfırla</button>' +
     '<div class="modal-actions" style="margin-top:12px;">' +
@@ -1398,7 +1456,7 @@ function openMainMenu() {
   document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
   document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
   document.getElementById('menuQr').addEventListener('click', openQrModal);
-  document.getElementById('menuArchive').addEventListener('click', openArchiveList);
+  document.getElementById('menuHatimList').addEventListener('click', openHatimList);
   document.getElementById('menuNewHatim').addEventListener('click', () => requireAdmin(startNewHatim));
   document.getElementById('menuReset').addEventListener('click', () => requireAdmin(resetAll));
   document.getElementById('menuCloseBtn').addEventListener('click', closeModal);
