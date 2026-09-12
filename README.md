@@ -13,7 +13,8 @@ Association Harmonie31 bünyesinde düzenlenen hatimler için cüz dağılım ve
 Bu proje sadece Harmonie31 üyeleri arasında dahili kullanım içindir.
 
 ## Version
-1.0
-2.0 admin modu eklendi
+- 1.0
+- 2.0 admin modu eklendi
+- 2.1 
 ---
 Firebase (Firestore) + statik HTML/JS ile çalışır, GitHub Pages üzerinde barındırılır.
