@@ -6,6 +6,14 @@
 <title>Hatim-i Şerif</title>
 <link rel="icon" type="image/png" href="favicon.png">
 
+<!-- PWA: telefonun ana ekranına eklenebilmesi için -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1E4D3B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hatim-i Şerif">
+
 <!-- Open Graph / WhatsApp link preview — requires og-image.png uploaded in the same folder as this file -->
 <meta property="og:title" content="Hatim-i Şerif — Cüz Dağılım Listesi">
 <meta property="og:description" content="Boş bir cüze dokun, ismini yaz, senin olsun.">
@@ -1700,7 +1708,8 @@ function openMainMenu() {
     '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
     '<button class="btn btn-ghost" id="menuHatimList" style="width:100%; margin-bottom:8px;">Hatim Listesi</button>' +
     '<button class="btn btn-help" id="menuNewHatim" style="width:100%; margin-bottom:8px;">Yeni Hatim Ekle</button>' +
-    '<button class="btn btn-danger" id="menuReset" style="width:100%;">Bu Hatimi Sıfırla</button>' +
+    '<button class="btn btn-danger" id="menuReset" style="width:100%; margin-bottom:8px;">Bu Hatimi Sıfırla</button>' +
+    '<button class="btn btn-ghost" id="menuGoCevsen" style="width:100%;">📿 Cevşen Listesi\'ne Geç</button>' +
     '<div class="modal-actions" style="margin-top:12px;">' +
       '<button class="btn btn-ghost" id="menuCloseBtn">Kapat</button>' +
     '</div>';
@@ -1714,6 +1723,7 @@ function openMainMenu() {
   document.getElementById('menuHatimList').addEventListener('click', openHatimList);
   document.getElementById('menuNewHatim').addEventListener('click', () => requireAdmin(startNewHatim));
   document.getElementById('menuReset').addEventListener('click', () => requireAdmin(resetAll));
+  document.getElementById('menuGoCevsen').addEventListener('click', () => { window.location.href = 'https://sadikerd.github.io/cevsen-listesi/'; });
   document.getElementById('menuCloseBtn').addEventListener('click', closeModal);
   overlay.classList.add('open');
 }
