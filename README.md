@@ -35,6 +35,7 @@ Statik HTML/JS + [Firebase Firestore](https://firebase.google.com/) (canlı senk
 | 2.1 | "Boşalt" ve "Okudum" tekrar herkese açıldı |
 | 3.0 | Birden fazla hatim aynı anda tutulabiliyor — "Hatim Listesi" menüsünden geçmiş/güncel hatimler arasında geçiş yapılabiliyor |
 | 3.1 | Hatim tamamlanınca kutlama animasyonu, "En Çok Katkı Sağlayanlar" tablosu, hedef tarihe 3 gün kala kırmızı uyarı, yönetici modunda hatim silme |
+| 3.2 | Telefon ana ekranına uygulama gibi eklenebiliyor (PWA); menüden Cevşen Listesi'ne geçiş linki eklendi |
 
 ---
 <p align="center"><i>Harmonie31 için sevgiyle hazırlandı 🌙</i></p>
