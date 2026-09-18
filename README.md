@@ -36,6 +36,7 @@ Statik HTML/JS + [Firebase Firestore](https://firebase.google.com/) (canlı senk
 | 3.0 | Birden fazla hatim aynı anda tutulabiliyor — "Hatim Listesi" menüsünden geçmiş/güncel hatimler arasında geçiş yapılabiliyor |
 | 3.1 | Hatim tamamlanınca kutlama animasyonu, "En Çok Katkı Sağlayanlar" tablosu, hedef tarihe 3 gün kala kırmızı uyarı, yönetici modunda hatim silme |
 | 3.2 | Telefon ana ekranına uygulama gibi eklenebiliyor (PWA); menüden Cevşen Listesi'ne geçiş linki eklendi |
+| 3.4 | "📸 Özet Kartı Paylaş" eklendi (Canvas ile oluşturulan görsel kart, telefonun paylaşım menüsünden gönderilebiliyor); WhatsApp mesajından "Hatim Duası" satırı kaldırıldı; özet kart 30 cüz üzerinden hesaplanıyor |
 
 ---
 <p align="center"><i>Harmonie31 için sevgiyle hazırlandı 🌙</i></p>
