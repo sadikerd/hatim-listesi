@@ -1423,15 +1423,148 @@ function getRemainingTimeCaps() {
   return text;
 }
 
+function loadImageSafe(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image failed'));
+    img.src = src;
+  });
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function fitTextFont(ctx, text, maxWidth, startSize, family, weight) {
+  let size = startSize;
+  ctx.font = weight + ' ' + size + 'px ' + family;
+  while (ctx.measureText(text).width > maxWidth && size > 24) {
+    size -= 2;
+    ctx.font = weight + ' ' + size + 'px ' + family;
+  }
+  return size;
+}
+
+async function shareProgressImage() {
+  const h = getSelectedHatim();
+  const cuzOnly = h.cuzler.slice(0, CUZ_TOTAL);
+  const completedCount = cuzOnly.filter((e) => e && e.completed).length;
+  const takenCount = cuzOnly.filter(Boolean).length;
+  const pct = completedCount / CUZ_TOTAL;
+
+  const W = 1080, H = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#F5EFE1';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#143327';
+  ctx.fillRect(0, 0, W, 10);
+  ctx.fillRect(0, H - 10, W, 10);
+
+  try {
+    const logo = await loadImageSafe('logo.png');
+    const size = 170, cx = W / 2, cy = 155;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, cx - size / 2, cy - size / 2, size, size);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#D9C68F';
+    ctx.stroke();
+  } catch (e) { /* logo yüklenemedi, sorun değil */ }
+
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = '#B08A2E';
+  ctx.font = '600 30px "Work Sans", sans-serif';
+  ctx.fillText('HATİM-İ ŞERİF', W / 2, 300);
+
+  const hatimName = h.hatimName || 'Hatim';
+  ctx.fillStyle = '#143327';
+  const nameFont = fitTextFont(ctx, hatimName, W - 160, 62, "'Amiri', serif", '700');
+  ctx.font = '700 ' + nameFont + "px 'Amiri', serif";
+  ctx.fillText(hatimName, W / 2, 400);
+
+  ctx.fillStyle = '#1E4D3B';
+  ctx.font = "700 150px 'Amiri', serif";
+  ctx.fillText(completedCount + ' / ' + CUZ_TOTAL, W / 2, 610);
+
+  ctx.fillStyle = '#5B6350';
+  ctx.font = '500 34px "Work Sans", sans-serif';
+  ctx.fillText('cüz tamamlandı', W / 2, 665);
+
+  const barW = 820, barH = 34, barX = (W - barW) / 2, barY = 730;
+  ctx.fillStyle = '#ECE3CC';
+  roundRectPath(ctx, barX, barY, barW, barH, barH / 2);
+  ctx.fill();
+  ctx.strokeStyle = '#D8CBA8';
+  ctx.lineWidth = 2;
+  roundRectPath(ctx, barX, barY, barW, barH, barH / 2);
+  ctx.stroke();
+  if (pct > 0) {
+    ctx.fillStyle = '#1E4D3B';
+    roundRectPath(ctx, barX, barY, Math.max(barH, barW * pct), barH, barH / 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#5B6350';
+  ctx.font = '400 28px "Work Sans", sans-serif';
+  ctx.fillText(takenCount + ' / ' + CUZ_TOTAL + ' alınmış', W / 2, 815);
+
+  ctx.fillStyle = '#B08A2E';
+  ctx.font = '500 26px "Work Sans", sans-serif';
+  ctx.fillText('Harmonie31', W / 2, H - 60);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) { showMessage('Görsel oluşturulamadı.'); return; }
+    const fileName = 'hatim-ozet.png';
+    try {
+      const file = new File([blob], fileName, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Hatim Özet',
+          text: (h.hatimName || 'Hatim') + ' — ' + completedCount + '/' + CUZ_TOTAL + ' tamamlandı 🌙'
+        });
+        return;
+      }
+    } catch (e) { /* paylaşım iptal edildi/desteklenmiyor — indirmeye düş */ }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showMessage('Görsel indirildi — bu tarayıcı direkt paylaşımı desteklemiyor. İndirilen resmi WhatsApp\'a elle ekleyip gönderebilirsin.');
+  }, 'image/png');
+}
+
 function shareOnWhatsApp() {
   const h = getSelectedHatim();
   const takenCount = h.cuzler.filter(Boolean).length;
   const completedCount = h.cuzler.filter((e) => e && e.completed).length;
   const emptyNumbers = [];
   const helpNumbers = [];
-  let duaEntry = h.cuzler[CUZ_TOTAL];
   h.cuzler.forEach((entry, i) => {
-    if (i >= CUZ_TOTAL) return; // dua slot handled separately below
+    if (i >= CUZ_TOTAL) return; // hatim duası ayrı, WhatsApp mesajına dahil edilmiyor
     if (!entry) emptyNumbers.push(i + 1);
     else if (!entry.completed && entry.helpRequested) helpNumbers.push(i + 1);
   });
@@ -1451,7 +1584,6 @@ function shareOnWhatsApp() {
   } else {
     lines.push('*Boş cüz kalmadı* 🎉');
   }
-  lines.push(duaEntry ? '*Hatim Duası:* ' + duaEntry.name + ' aldı' + (duaEntry.completed ? ' ✓' : '') : '*Hatim Duası:* henüz kimse almadı');
   if (helpNumbers.length > 0) {
     lines.push('');
     lines.push('🆘 *Yardım isteyen cüzler:* ' + helpNumbers.join(', '));
@@ -1705,6 +1837,7 @@ function openMainMenu() {
     '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
     '<button class="btn btn-ghost" id="menuLeaderboard" style="width:100%; margin-bottom:8px;">En Çok Katkı Sağlayanlar</button>' +
     '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
+    '<button class="btn btn-ghost" id="menuShareImage" style="width:100%; margin-bottom:8px;">📸 Özet Kartı Paylaş</button>' +
     '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
     '<button class="btn btn-ghost" id="menuHatimList" style="width:100%; margin-bottom:8px;">Hatim Listesi</button>' +
     '<button class="btn btn-help" id="menuNewHatim" style="width:100%; margin-bottom:8px;">Yeni Hatim Ekle</button>' +
@@ -1719,6 +1852,7 @@ function openMainMenu() {
   document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
   document.getElementById('menuLeaderboard').addEventListener('click', openLeaderboard);
   document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
+  document.getElementById('menuShareImage').addEventListener('click', () => { closeModal(); shareProgressImage(); });
   document.getElementById('menuQr').addEventListener('click', openQrModal);
   document.getElementById('menuHatimList').addEventListener('click', openHatimList);
   document.getElementById('menuNewHatim').addEventListener('click', () => requireAdmin(startNewHatim));
