@@ -2,7 +2,9 @@
 
 Association Harmonie31 bünyesinde düzenlenen hatimler için cüz dağılım ve takip uygulaması.
 
-🔗 **Canlı site:** [sadikerd.github.io/hatim-listesi](https://sadikerd.github.io/hatim-listesi/)
+🔗 **Canlı site:** 
+- [sadikerd.github.io/hatim-listesi](https://sadikerd.github.io/hatim-listesi/)
+- [https://kuran.724oku.com/](https://kuran.724oku.com/)
 
 ---
 
