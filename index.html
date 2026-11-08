@@ -219,26 +219,31 @@
 
   .who-took-list li {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 10px;
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--line);
-    font-size: 14px;
   }
 
-  .who-took-list li span:first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .who-took-list li .li-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     min-width: 0;
+    flex: 1;
   }
 
-  .who-took-list li span.count {
+  .who-took-list li .li-text span:first-child {
+    font-size: 16px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .who-took-list li .li-text span.count {
     color: var(--ink-soft);
-    font-size: 12.5px;
-    flex-shrink: 0;
-    white-space: nowrap;
+    font-size: 13px;
   }
 
   .hatim-delete-btn {
@@ -430,7 +435,9 @@
     border-radius: 14px;
     padding: 22px 20px;
     width: 100%;
-    max-width: 320px;
+    max-width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
     box-shadow: 0 12px 30px rgba(0,0,0,0.2);
   }
 
@@ -496,6 +503,12 @@
     border: 1px solid var(--line);
   }
 
+  .btn-nav {
+    background: var(--paper-deep);
+    color: var(--emerald);
+    border: 1px solid var(--line);
+  }
+
   .btn-danger {
     background: transparent;
     color: #A6432D;
@@ -505,6 +518,12 @@
   .btn-help {
     background: #A6432D;
     color: var(--white);
+  }
+
+  .btn-account {
+    background: #E3D3DA;
+    color: #6B3F52;
+    border: 1px solid #C9A6B5;
   }
 
   .pin-hint {
@@ -736,15 +755,30 @@ function todayStr() {
   return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
 }
 
+function getStoredName() {
+  try { return localStorage.getItem('hatimUserName') || null; } catch (e) { return null; }
+}
+
+function setStoredName(name) {
+  try { localStorage.setItem('hatimUserName', name); } catch (e) { /* sorun değil */ }
+}
+
 function genId() {
   return 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function currentMonthLabel() {
+  const trMonths = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  const frMonths = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  const idx = new Date().getMonth();
+  return trMonths[idx] + ' - ' + frMonths[idx];
 }
 
 function freshHatim(name) {
   return {
     id: genId(),
-    hatimName: name || '1. Hatim',
-    hatimStart: null,
+    hatimName: name || currentMonthLabel(),
+    hatimStart: todayStr(),
     targetDate: null,
     description: 'Boş bir cüze dokunup ismini yaz, senin olsun.',
     createdDate: todayStr(),
@@ -991,12 +1025,12 @@ function openModal(index) {
     modalContent.innerHTML =
       '<h2>' + slotLabel(index) + '</h2>' +
       '<p class="sub">Bu ' + slotNoun(index) + ' boş. Almak için ismini yaz.</p>' +
-      '<input type="text" id="nameInput" placeholder="İsmin" maxlength="30" autofocus>' +
+      '<input type="text" id="nameInput" placeholder="İsmin" maxlength="30" value="' + escapeHtml(getStoredName() || '') + '" autofocus>' +
       '<input type="tel" id="pinInput" placeholder="4 haneli PIN (opsiyonel)" maxlength="4" inputmode="numeric" pattern="[0-9]*">' +
       '<p class="pin-hint" id="pinHintBtn">Bu PIN ne işe yarar? →</p>' +
       '<div class="modal-actions">' +
         '<button class="btn btn-ghost" id="cancelBtn">Vazgeç</button>' +
-        '<button class="btn btn-primary" id="claimBtn" disabled>Al</button>' +
+        '<button class="btn btn-primary" id="claimBtn"' + (getStoredName() ? '' : ' disabled') + '>Al</button>' +
       '</div>';
     const input = document.getElementById('nameInput');
     const pinInput = document.getElementById('pinInput');
@@ -1221,7 +1255,12 @@ function disableAdminMode() {
 
 function requireAdmin(action) {
   if (adminMode) { action(); return; }
-  showMessage('Bu işlem için Yönetici Modunu açman gerekiyor — Menü → Yönetici Modunu Aç.');
+  modalContent.innerHTML =
+    '<h2>🔒 Yönetici Modu Gerekli!</h2>' +
+    '<p class="sub">Bu işlem için Yönetici Modunu açman gerekiyor — Menü → Yönetici Modunu Aç.</p>' +
+    '<div class="modal-actions"><button class="btn btn-primary" id="adminRequiredOkBtn" style="width:100%;">Tamam</button></div>';
+  document.getElementById('adminRequiredOkBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
 }
 
 function parseDDMMYYYY(str) {
@@ -1266,62 +1305,149 @@ function renderCountdownNow() {
   countdownBanner.className = totalMinutes <= 3 * 24 * 60 ? 'countdown-banner soon' : 'countdown-banner';
 }
 
-function openWhoTook() {
-  const h = getSelectedHatim();
-  const counts = {};
-  h.cuzler.forEach((entry) => {
-    if (!entry) return;
-    if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
-    counts[entry.name].total++;
-    if (entry.completed) counts[entry.name].completed++;
+function openAccountModal() {
+  const myName = getStoredName();
+  const readItems = [];
+  (state.hatims || []).forEach((h) => {
+    (h.cuzler || []).forEach((e, idx) => {
+      if (e && e.completed && myName && e.name === myName) {
+        readItems.push({ hatimName: h.hatimName || 'Hatim', slot: slotLabel(idx) });
+      }
+    });
   });
-  const names = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total || a.localeCompare(b));
-  let listHtml;
-  if (names.length === 0) {
-    listHtml = '<p class="sub">Henüz kimse cüz almadı.</p>';
-  } else {
-    listHtml = '<ul class="who-took-list">' +
-      names.map((n) => '<li><span>' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
+
+  const readListHtml = readItems.length === 0
+    ? '<p class="sub" style="margin:0;">Henüz tamamladığın bir cüz/dua yok.</p>'
+    : '<ul class="who-took-list" style="max-height:220px; margin-bottom:0;">' +
+        readItems.map((item) => '<li><span class="li-text"><span>' + escapeHtml(item.slot) + '</span><span class="count">' + escapeHtml(item.hatimName) + '</span></span></li>').join('') +
       '</ul>';
-  }
+
   modalContent.innerHTML =
-    '<h2>Kim Aldı?</h2>' +
-    listHtml +
-    '<div class="modal-actions">' +
-      '<button class="btn btn-primary" id="whoTookCloseBtn">Kapat</button>' +
+    '<h2>Hesap Bilgilerim</h2>' +
+    (myName
+      ? '<div class="taken-info">İsmin: ' + escapeHtml(myName) + '</div>'
+      : '<p class="sub">Henüz bir cüz almadın — ismin, ilk cüz aldığında burada görünecek.</p>') +
+    '<p class="sub" style="font-weight:600; margin:14px 0 8px;">Toplam Okuduğum (' + readItems.length + ')</p>' +
+    readListHtml +
+    '<div class="modal-actions" style="margin-top:14px;">' +
+      '<button class="btn btn-account" id="acctChangeNameBtn" style="width:100%;">İsmini Değiştir</button>' +
+    '</div>' +
+    '<div class="modal-actions" style="margin-top:8px;">' +
+      '<button class="btn btn-nav" id="acctBackBtn" style="width:100%;">← Menü</button>' +
+      '<button class="btn btn-nav" id="acctCloseBtn" style="width:100%;">Kapat</button>' +
     '</div>';
+  document.getElementById('acctChangeNameBtn').addEventListener('click', openChangeNameModal);
+  document.getElementById('acctBackBtn').addEventListener('click', openMainMenu);
+  document.getElementById('acctCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+function openChangeNameModal() {
+  const current = getStoredName() || '';
+  modalContent.innerHTML =
+    '<h2>İsmini Değiştir</h2>' +
+    '<p class="sub">Bundan sonra bir cüzü alırken bu isim kullanılacak.</p>' +
+    '<input type="text" id="changeNameInput" value="' + escapeHtml(current) + '" maxlength="30" autofocus>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-nav" id="changeNameCancelBtn">← Geri</button>' +
+      '<button class="btn btn-primary" id="changeNameSaveBtn">Kaydet</button>' +
+    '</div>' +
+    '<div class="modal-actions" style="margin-top:8px;"><button class="btn btn-nav" id="changeNameCloseBtn" style="width:100%;">Kapat</button></div>';
+  document.getElementById('changeNameCancelBtn').addEventListener('click', openAccountModal);
+  document.getElementById('changeNameCloseBtn').addEventListener('click', closeModal);
+  const input = document.getElementById('changeNameInput');
+  const saveIt = () => {
+    const val = input.value.trim();
+    if (!val) { showMessage('Bir isim yaz.'); return; }
+    setStoredName(val);
+    closeModal();
+    showMessage('İsmin güncellendi: ' + val);
+  };
+  document.getElementById('changeNameSaveBtn').addEventListener('click', saveIt);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveIt(); });
+  overlay.classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+function openStatsModal() {
+  modalContent.innerHTML =
+    '<h2>İstatistikler</h2>' +
+    '<p class="sub">Neyi görmek istersin?</p>' +
+    '<button class="btn btn-ghost" id="statsWhoTookBtn" style="width:100%; margin-bottom:8px;">Bu Hatimde Kim Aldı?</button>' +
+    '<button class="btn btn-ghost" id="statsLeaderboardBtn" style="width:100%; margin-bottom:12px;">Tüm Hatimlerde En Çok Katkı Sağlayanlar</button>' +
+    '<div class="modal-actions"><button class="btn btn-nav" id="statsBackBtn" style="width:100%;">← Menü</button><button class="btn btn-nav" id="statsCloseBtn" style="width:100%;">Kapat</button></div>';
+  document.getElementById('statsWhoTookBtn').addEventListener('click', openWhoTookModal);
+  document.getElementById('statsLeaderboardBtn').addEventListener('click', openLeaderboardModal);
+  document.getElementById('statsBackBtn').addEventListener('click', openMainMenu);
+  document.getElementById('statsCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+function openWhoTookModal() {
+  const h = getSelectedHatim();
+  const perHatimCounts = {};
+  (h.cuzler || []).forEach((entry) => {
+    if (!entry) return;
+    if (!perHatimCounts[entry.name]) perHatimCounts[entry.name] = { total: 0, completed: 0 };
+    perHatimCounts[entry.name].total++;
+    if (entry.completed) perHatimCounts[entry.name].completed++;
+  });
+  const perHatimNames = Object.keys(perHatimCounts).sort((a, b) => perHatimCounts[b].total - perHatimCounts[a].total || a.localeCompare(b));
+  const perHatimHtml = perHatimNames.length === 0
+    ? '<p class="sub" style="margin:0;">Henüz kimse cüz almadı.</p>'
+    : '<ul class="who-took-list" style="margin-bottom:0;">' +
+        perHatimNames.map((n) => '<li><span class="li-text"><span>' + escapeHtml(n) + '</span><span class="count">' + perHatimCounts[n].completed + ' / ' + perHatimCounts[n].total + ' okundu</span></span></li>').join('') +
+      '</ul>';
+
+  modalContent.innerHTML =
+    '<h2>Bu Hatimde Kim Aldı?</h2>' +
+    perHatimHtml +
+    '<div class="modal-actions" style="margin-top:14px;"><button class="btn btn-nav" id="whoTookBackBtn" style="width:100%;">← İstatistikler</button><button class="btn btn-nav" id="whoTookCloseBtn" style="width:100%;">Kapat</button></div>';
+  document.getElementById('whoTookBackBtn').addEventListener('click', openStatsModal);
   document.getElementById('whoTookCloseBtn').addEventListener('click', closeModal);
   overlay.classList.add('open');
 }
 
-function openLeaderboard() {
-  const counts = {};
-  (state.hatims || []).forEach((h) => {
-    (h.cuzler || []).forEach((entry) => {
+function openLeaderboardModal() {
+  const allCounts = {};
+  (state.hatims || []).forEach((hh) => {
+    (hh.cuzler || []).forEach((entry) => {
       if (!entry) return;
-      if (!counts[entry.name]) counts[entry.name] = { total: 0, completed: 0 };
-      counts[entry.name].total++;
-      if (entry.completed) counts[entry.name].completed++;
+      if (!allCounts[entry.name]) allCounts[entry.name] = { total: 0, completed: 0 };
+      allCounts[entry.name].total++;
+      if (entry.completed) allCounts[entry.name].completed++;
     });
   });
-  const names = Object.keys(counts).sort((a, b) => counts[b].completed - counts[a].completed || counts[b].total - counts[a].total || a.localeCompare(b));
-  let listHtml;
-  if (names.length === 0) {
-    listHtml = '<p class="sub">Henüz hiç veri yok.</p>';
-  } else {
-    const medals = ['🥇', '🥈', '🥉'];
-    listHtml = '<ul class="who-took-list">' +
-      names.map((n, i) => '<li><span>' + (medals[i] || (i + 1) + '.') + ' ' + escapeHtml(n) + '</span><span class="count">' + counts[n].completed + ' / ' + counts[n].total + ' okundu</span></li>').join('') +
+  const allNames = Object.keys(allCounts).sort((a, b) => allCounts[b].completed - allCounts[a].completed || allCounts[b].total - allCounts[a].total || a.localeCompare(b));
+  const medals = ['🥇', '🥈', '🥉'];
+  const leaderboardHtml = allNames.length === 0
+    ? '<p class="sub" style="margin:0;">Henüz hiç veri yok.</p>'
+    : '<ul class="who-took-list" style="margin-bottom:0;">' +
+        allNames.map((n, i) => '<li><span class="li-text"><span>' + (medals[i] || (i + 1) + '.') + ' ' + escapeHtml(n) + '</span><span class="count">' + allCounts[n].completed + ' / ' + allCounts[n].total + ' okundu</span></span></li>').join('') +
       '</ul>';
-  }
+
   modalContent.innerHTML =
     '<h2>En Çok Katkı Sağlayanlar</h2>' +
-    '<p class="sub">Tüm hatimler boyunca, kim kaç cüz/dua okumuş.</p>' +
-    listHtml +
-    '<div class="modal-actions">' +
-      '<button class="btn btn-primary" id="leaderboardCloseBtn">Kapat</button>' +
-    '</div>';
+    leaderboardHtml +
+    '<div class="modal-actions" style="margin-top:14px;"><button class="btn btn-nav" id="leaderboardBackBtn" style="width:100%;">← İstatistikler</button><button class="btn btn-nav" id="leaderboardCloseBtn" style="width:100%;">Kapat</button></div>';
+  document.getElementById('leaderboardBackBtn').addEventListener('click', openStatsModal);
   document.getElementById('leaderboardCloseBtn').addEventListener('click', closeModal);
+  overlay.classList.add('open');
+}
+
+function openShareModal() {
+  modalContent.innerHTML =
+    '<h2>Paylaş</h2>' +
+    '<p class="sub">Bu hatimi nasıl paylaşmak istersin?</p>' +
+    '<button class="btn btn-ghost" id="shareWaBtn" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş (metin)</button>' +
+    '<button class="btn btn-ghost" id="shareImgBtn" style="width:100%; margin-bottom:8px;">📸 Özet Kartı Paylaş (görsel)</button>' +
+    '<button class="btn btn-ghost" id="shareQrBtn" style="width:100%; margin-bottom:12px;">QR kod göster</button>' +
+    '<div class="modal-actions"><button class="btn btn-nav" id="shareBackBtn" style="width:100%;">← Menü</button><button class="btn btn-nav" id="shareCloseBtn" style="width:100%;">Kapat</button></div>';
+  document.getElementById('shareWaBtn').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
+  document.getElementById('shareImgBtn').addEventListener('click', () => { closeModal(); shareProgressImage(); });
+  document.getElementById('shareQrBtn').addEventListener('click', openQrModal);
+  document.getElementById('shareBackBtn').addEventListener('click', openMainMenu);
+  document.getElementById('shareCloseBtn').addEventListener('click', closeModal);
   overlay.classList.add('open');
 }
 
@@ -1335,8 +1461,10 @@ function openQrModal() {
       '<img src="' + qrImgUrl + '" alt="QR kod" style="width:220px; height:220px; border:1px solid var(--line); border-radius:8px; background:var(--white);">' +
     '</div>' +
     '<div class="modal-actions">' +
-      '<button class="btn btn-primary" id="qrCloseBtn">Kapat</button>' +
+      '<button class="btn btn-nav" id="qrBackBtn">← Paylaş</button>' +
+      '<button class="btn btn-nav" id="qrCloseBtn">Kapat</button>' +
     '</div>';
+  document.getElementById('qrBackBtn').addEventListener('click', openShareModal);
   document.getElementById('qrCloseBtn').addEventListener('click', closeModal);
   overlay.classList.add('open');
 }
@@ -1356,8 +1484,10 @@ function openHatimList() {
           ? '<button class="hatim-delete-btn" data-del-id="' + h.id + '" title="Bu hatimi sil">🗑️</button>'
           : '';
         return '<li style="cursor:pointer;' + (isSelected ? ' font-weight:700;' : '') + '" data-id="' + h.id + '">' +
-          '<span>' + (isSelected ? '● ' : '') + escapeHtml(h.hatimName || 'Hatim') + '</span>' +
-          '<span class="count">' + completed + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.createdDate || '') + '</span>' +
+          '<span class="li-text">' +
+            '<span>' + (isSelected ? '● ' : '') + escapeHtml(h.hatimName || 'Hatim') + '</span>' +
+            '<span class="count">' + completed + ' / ' + TOTAL + ' okundu · ' + escapeHtml(h.createdDate || '') + '</span>' +
+          '</span>' +
           deleteBtn +
           '</li>';
       }).join('') +
@@ -1368,8 +1498,10 @@ function openHatimList() {
     '<p class="sub">Görüntülemek istediğin hatime dokun.' + (adminMode ? ' Silmek için 🗑️ ikonuna dokun.' : '') + '</p>' +
     listHtml +
     '<div class="modal-actions">' +
-      '<button class="btn btn-primary" id="hatimListCloseBtn">Kapat</button>' +
+      '<button class="btn btn-nav" id="hatimListBackBtn" style="width:100%;">← Menü</button>' +
+      '<button class="btn btn-nav" id="hatimListCloseBtn" style="width:100%;">Kapat</button>' +
     '</div>';
+  document.getElementById('hatimListBackBtn').addEventListener('click', openMainMenu);
   document.getElementById('hatimListCloseBtn').addEventListener('click', closeModal);
   modalContent.querySelectorAll('.who-took-list li').forEach((li) => {
     li.addEventListener('click', () => {
@@ -1426,6 +1558,7 @@ function getRemainingTimeCaps() {
 function loadImageSafe(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('image failed'));
     img.src = src;
@@ -1453,6 +1586,15 @@ function fitTextFont(ctx, text, maxWidth, startSize, family, weight) {
 }
 
 async function shareProgressImage() {
+  showMessage('Görsel hazırlanıyor, birkaç saniye sürebilir…');
+  try {
+    await buildAndShareProgressImage();
+  } catch (e) {
+    showMessage('Görsel oluşturulurken bir sorun oldu: ' + (e && e.message ? e.message : 'bilinmeyen hata') + '. Tekrar dener misin?');
+  }
+}
+
+async function buildAndShareProgressImage() {
   const h = getSelectedHatim();
   const cuzOnly = h.cuzler.slice(0, CUZ_TOTAL);
   const completedCount = cuzOnly.filter((e) => e && e.completed).length;
@@ -1530,31 +1672,31 @@ async function shareProgressImage() {
   ctx.font = '500 26px "Work Sans", sans-serif';
   ctx.fillText('Harmonie31', W / 2, H - 60);
 
-  canvas.toBlob(async (blob) => {
-    if (!blob) { showMessage('Görsel oluşturulamadı.'); return; }
-    const fileName = 'hatim-ozet.png';
-    try {
-      const file = new File([blob], fileName, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Hatim Özet',
-          text: (h.hatimName || 'Hatim') + ' — ' + completedCount + '/' + CUZ_TOTAL + ' tamamlandı 🌙'
-        });
-        return;
-      }
-    } catch (e) { /* paylaşım iptal edildi/desteklenmiyor — indirmeye düş */ }
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) { showMessage('Görsel oluşturulamadı — bu tarayıcı desteklemiyor olabilir.'); return; }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    showMessage('Görsel indirildi — bu tarayıcı direkt paylaşımı desteklemiyor. İndirilen resmi WhatsApp\'a elle ekleyip gönderebilirsin.');
-  }, 'image/png');
+  const fileName = 'hatim-ozet.png';
+  try {
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'Hatim Özet',
+        text: (h.hatimName || 'Hatim') + ' — ' + completedCount + '/' + CUZ_TOTAL + ' tamamlandı 🌙'
+      });
+      return;
+    }
+  } catch (e) { /* paylaşım iptal edildi/desteklenmiyor — indirmeye düş */ }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  showMessage('Görsel indirildi — bu tarayıcı direkt paylaşımı desteklemiyor. İndirilen resmi WhatsApp\'a elle ekleyip gönderebilirsin.');
 }
 
 function shareOnWhatsApp() {
@@ -1621,6 +1763,7 @@ async function claimTile() {
   }
   h.cuzler[activeIndex] = { name: name, date: todayStr(), completed: false, completedDate: null, pin: pin, helpRequested: false };
   await saveState();
+  setStoredName(name);
   render();
   closeModal();
   const nounCap = noun.charAt(0).toUpperCase() + noun.slice(1);
@@ -1834,27 +1977,23 @@ function openMainMenu() {
   modalContent.innerHTML =
     '<h2>Menü</h2>' +
     '<button class="btn ' + adminToggleClass + '" id="menuAdminToggle" style="width:100%; margin-bottom:8px;">' + adminToggleLabel + '</button>' +
-    '<button class="btn btn-ghost" id="menuWhoTook" style="width:100%; margin-bottom:8px;">Kim aldı?</button>' +
-    '<button class="btn btn-ghost" id="menuLeaderboard" style="width:100%; margin-bottom:8px;">En Çok Katkı Sağlayanlar</button>' +
-    '<button class="btn btn-ghost" id="menuShare" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş</button>' +
-    '<button class="btn btn-ghost" id="menuShareImage" style="width:100%; margin-bottom:8px;">📸 Özet Kartı Paylaş</button>' +
-    '<button class="btn btn-ghost" id="menuQr" style="width:100%; margin-bottom:8px;">QR kod</button>' +
+    '<button class="btn btn-ghost" id="menuAccount" style="width:100%; margin-bottom:8px;">👤 Hesap Bilgilerim</button>' +
     '<button class="btn btn-ghost" id="menuHatimList" style="width:100%; margin-bottom:8px;">Hatim Listesi</button>' +
+    '<button class="btn btn-ghost" id="menuStats" style="width:100%; margin-bottom:8px;">📊 İstatistikler</button>' +
+    '<button class="btn btn-ghost" id="menuShareHub" style="width:100%; margin-bottom:8px;">📤 Paylaş</button>' +
     '<button class="btn btn-help" id="menuNewHatim" style="width:100%; margin-bottom:8px;">Yeni Hatim Ekle</button>' +
     '<button class="btn btn-danger" id="menuReset" style="width:100%; margin-bottom:8px;">Bu Hatimi Sıfırla</button>' +
     '<button class="btn btn-ghost" id="menuGoCevsen" style="width:100%;">📿 Cevşen Listesi\'ne Geç</button>' +
     '<div class="modal-actions" style="margin-top:12px;">' +
-      '<button class="btn btn-ghost" id="menuCloseBtn">Kapat</button>' +
+      '<button class="btn btn-nav" id="menuCloseBtn">Kapat</button>' +
     '</div>';
   document.getElementById('menuAdminToggle').addEventListener('click', () => {
     if (adminMode) { disableAdminMode(); } else { openAdminModeModal(); }
   });
-  document.getElementById('menuWhoTook').addEventListener('click', openWhoTook);
-  document.getElementById('menuLeaderboard').addEventListener('click', openLeaderboard);
-  document.getElementById('menuShare').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
-  document.getElementById('menuShareImage').addEventListener('click', () => { closeModal(); shareProgressImage(); });
-  document.getElementById('menuQr').addEventListener('click', openQrModal);
+  document.getElementById('menuAccount').addEventListener('click', openAccountModal);
   document.getElementById('menuHatimList').addEventListener('click', openHatimList);
+  document.getElementById('menuStats').addEventListener('click', openStatsModal);
+  document.getElementById('menuShareHub').addEventListener('click', openShareModal);
   document.getElementById('menuNewHatim').addEventListener('click', () => requireAdmin(startNewHatim));
   document.getElementById('menuReset').addEventListener('click', () => requireAdmin(resetAll));
   document.getElementById('menuGoCevsen').addEventListener('click', () => { window.location.href = 'https://sadikerd.github.io/cevsen-listesi/'; });
