@@ -709,6 +709,7 @@ function stateDocRef() {
 
 const CUZ_TOTAL = 30;
 const TOTAL = 31; // 30 cüz + 1 hatim duası
+const APP_URL = 'https://kuran.724oku.com/';
 
 // state = { hatims: [ { id, hatimName, hatimStart, targetDate, description, createdDate,
 //   cuzler: [{name, date, completed, completedDate, pin, helpRequested}|null, ...31] }, ... ] }
@@ -1441,10 +1442,12 @@ function openShareModal() {
     '<p class="sub">Bu hatimi nasıl paylaşmak istersin?</p>' +
     '<button class="btn btn-ghost" id="shareWaBtn" style="width:100%; margin-bottom:8px;">WhatsApp\'ta paylaş (metin)</button>' +
     '<button class="btn btn-ghost" id="shareImgBtn" style="width:100%; margin-bottom:8px;">📸 Özet Kartı Paylaş (görsel)</button>' +
+    '<button class="btn btn-ghost" id="shareGridBtn" style="width:100%; margin-bottom:8px;">🗂️ Tam Liste Paylaş (kim ne almış)</button>' +
     '<button class="btn btn-ghost" id="shareQrBtn" style="width:100%; margin-bottom:12px;">QR kod göster</button>' +
     '<div class="modal-actions"><button class="btn btn-nav" id="shareBackBtn" style="width:100%;">← Menü</button><button class="btn btn-nav" id="shareCloseBtn" style="width:100%;">Kapat</button></div>';
   document.getElementById('shareWaBtn').addEventListener('click', () => { closeModal(); shareOnWhatsApp(); });
   document.getElementById('shareImgBtn').addEventListener('click', () => { closeModal(); shareProgressImage(); });
+  document.getElementById('shareGridBtn').addEventListener('click', () => { closeModal(); shareGridImage(); });
   document.getElementById('shareQrBtn').addEventListener('click', openQrModal);
   document.getElementById('shareBackBtn').addEventListener('click', openMainMenu);
   document.getElementById('shareCloseBtn').addEventListener('click', closeModal);
@@ -1682,7 +1685,232 @@ async function buildAndShareProgressImage() {
       await navigator.share({
         files: [file],
         title: 'Hatim Özet',
-        text: (h.hatimName || 'Hatim') + ' — ' + completedCount + '/' + CUZ_TOTAL + ' tamamlandı 🌙'
+        text: (h.hatimName || 'Hatim') + ' — ' + completedCount + '/' + CUZ_TOTAL + ' tamamlandı 🌙\n' + APP_URL
+      });
+      return;
+    }
+  } catch (e) { /* paylaşım iptal edildi/desteklenmiyor — indirmeye düş */ }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  showMessage('Görsel indirildi — bu tarayıcı direkt paylaşımı desteklemiyor. İndirilen resmi WhatsApp\'a elle ekleyip gönderebilirsin.');
+}
+
+async function shareGridImage() {
+  showMessage('Liste görseli hazırlanıyor, birkaç saniye sürebilir…');
+  try {
+    await buildAndShareGridImage();
+  } catch (e) {
+    showMessage('Görsel oluşturulurken bir sorun oldu: ' + (e && e.message ? e.message : 'bilinmeyen hata') + '. Tekrar dener misin?');
+  }
+}
+
+function fitCellFont(ctx, text, maxWidth, startSize, minSize, family, weight) {
+  let size = startSize;
+  ctx.font = weight + ' ' + size + 'px ' + family;
+  while (ctx.measureText(text).width > maxWidth && size > minSize) {
+    size -= 1;
+    ctx.font = weight + ' ' + size + 'px ' + family;
+  }
+  return size;
+}
+
+function wrapNameLines(ctx, text, maxWidth, font) {
+  ctx.font = font;
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const words = text.split(' ');
+  if (words.length < 2) return [text];
+  const lines = [];
+  let current = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const test = current + ' ' + words[i];
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test;
+    } else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  lines.push(current);
+  return lines.slice(0, 2);
+}
+
+async function buildAndShareGridImage() {
+  const h = getSelectedHatim();
+  const cuzOnly = h.cuzler.slice(0, CUZ_TOTAL);
+  const completedCount = cuzOnly.filter((e) => e && e.completed).length;
+  const takenCount = cuzOnly.filter(Boolean).length;
+
+  const COLS = 4;
+  const ROWS = Math.ceil(CUZ_TOTAL / COLS);
+  const W = 1080;
+  const marginX = 46;
+  const gap = 14;
+  const gridW = W - marginX * 2;
+  const cellW = (gridW - gap * (COLS - 1)) / COLS;
+  const cellH = 210;
+  const gridH = ROWS * cellH + (ROWS - 1) * gap;
+
+  const headerH = 460;
+  const footerH = 100;
+  const gridTop = headerH;
+  const H = headerH + gridH + footerH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Arka plan
+  ctx.fillStyle = '#F5EFE1';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#143327';
+  ctx.fillRect(0, 0, W, 10);
+  ctx.fillRect(0, H - 10, W, 10);
+
+  // Başlık
+  try {
+    const logo = await loadImageSafe('logo.png');
+    const size = 110, cx = W / 2, cy = 90;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, cx - size / 2, cy - size / 2, size, size);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#D9C68F';
+    ctx.stroke();
+  } catch (e) { /* logo yüklenemedi, sorun değil */ }
+
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = '#B08A2E';
+  const kickerFont = fitTextFont(ctx, 'HATİM-İ ŞERİF — CÜZ DAĞILIM LİSTESİ', W - 100, 42, '"Work Sans", sans-serif', '700');
+  ctx.font = '700 ' + kickerFont + 'px "Work Sans", sans-serif';
+  ctx.fillText('HATİM-İ ŞERİF — CÜZ DAĞILIM LİSTESİ', W / 2, 168);
+
+  const hatimName = h.hatimName || 'Hatim';
+  ctx.fillStyle = '#143327';
+  const nameFont = fitTextFont(ctx, hatimName, W - 160, 56, "'Amiri', serif", '700');
+  ctx.font = '700 ' + nameFont + "px 'Amiri', serif";
+  ctx.fillText(hatimName, W / 2, 225);
+
+  ctx.fillStyle = '#5B6350';
+  ctx.font = '700 32px "Work Sans", sans-serif';
+  ctx.fillText(takenCount + ' / ' + CUZ_TOTAL + ' cüz alındı · ' + completedCount + ' tamamlandı', W / 2, 270);
+
+  const barW = 820, barH = 22, barX = (W - barW) / 2, barY = 295;
+  ctx.fillStyle = '#ECE3CC';
+  roundRectPath(ctx, barX, barY, barW, barH, barH / 2);
+  ctx.fill();
+  ctx.strokeStyle = '#D8CBA8';
+  ctx.lineWidth = 2;
+  roundRectPath(ctx, barX, barY, barW, barH, barH / 2);
+  ctx.stroke();
+  const pct = completedCount / CUZ_TOTAL;
+  if (pct > 0) {
+    ctx.fillStyle = '#1E4D3B';
+    roundRectPath(ctx, barX, barY, Math.max(barH, barW * pct), barH, barH / 2);
+    ctx.fill();
+  }
+
+  const legendY = 360;
+  ctx.textAlign = 'left';
+  let lx = marginX;
+  const legendDot = (color, label) => {
+    ctx.fillStyle = color;
+    roundRectPath(ctx, lx, legendY - 27, 36, 36, 8);
+    ctx.fill();
+    if (color === '#FFFDF8') { ctx.strokeStyle = '#1E4D3B'; ctx.lineWidth = 2.5; roundRectPath(ctx, lx, legendY - 27, 36, 36, 8); ctx.stroke(); }
+    ctx.fillStyle = '#3F4A33';
+    ctx.font = '700 38px "Work Sans", sans-serif';
+    ctx.fillText(label, lx + 46, legendY);
+    lx += ctx.measureText(label).width + 84;
+  };
+  legendDot('#143327', 'Okundu');
+  legendDot('#D9C68F', 'Alındı');
+  legendDot('#FFFDF8', 'Boş');
+  ctx.textAlign = 'center';
+
+  // Izgara
+  for (let i = 0; i < CUZ_TOTAL; i++) {
+    const entry = cuzOnly[i];
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    const x = marginX + col * (cellW + gap);
+    const y = gridTop + row * (cellH + gap);
+
+    let bg = '#FFFDF8', border = '#1E4D3B', numColor = '#143327', nameColor = '#26301F', statusColor = '#1E4D3B';
+    let statusText = 'Boş';
+    if (entry) {
+      if (entry.completed) {
+        bg = '#143327'; border = '#143327'; numColor = '#FFFDF8'; nameColor = '#FFFDF8'; statusColor = '#D9C68F';
+        statusText = '✓ Okundu';
+      } else {
+        bg = '#ECE3CC'; border = '#D9C68F'; numColor = '#9C8654'; nameColor = '#26301F'; statusColor = '#9C8654';
+        statusText = entry.helpRequested ? '🆘 yardım' : 'alındı';
+      }
+    }
+
+    ctx.fillStyle = bg;
+    roundRectPath(ctx, x, y, cellW, cellH, 14);
+    ctx.fill();
+    ctx.strokeStyle = border;
+    ctx.lineWidth = entry ? 2 : 2.5;
+    if (!entry) ctx.setLineDash([6, 5]);
+    roundRectPath(ctx, x, y, cellW, cellH, 14);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = numColor;
+    ctx.font = "700 36px 'Amiri', serif";
+    ctx.fillText(String(i + 1), x + cellW / 2, y + 46);
+
+    if (entry) {
+      const nameFontSize = fitCellFont(ctx, entry.name, cellW - 20, 34, 18, '"Work Sans", sans-serif', '700');
+      const nameLineFont = nameFontSize + 'px "Work Sans", sans-serif';
+      ctx.font = '700 ' + nameLineFont;
+      ctx.fillStyle = nameColor;
+      const nameLines = wrapNameLines(ctx, entry.name, cellW - 20, '700 ' + nameLineFont);
+      const nameStartY = nameLines.length > 1 ? y + 92 : y + 112;
+      nameLines.forEach((line, idx) => {
+        ctx.fillText(line, x + cellW / 2, nameStartY + idx * (nameFontSize + 8));
+      });
+      ctx.fillStyle = statusColor;
+      ctx.font = '700 26px "Work Sans", sans-serif';
+      ctx.fillText(statusText, x + cellW / 2, y + cellH - 24);
+    } else {
+      ctx.fillStyle = statusColor;
+      ctx.font = '700 30px "Work Sans", sans-serif';
+      ctx.fillText(statusText, x + cellW / 2, y + cellH / 2 + 24);
+    }
+  }
+
+  ctx.fillStyle = '#B08A2E';
+  ctx.font = '700 32px "Work Sans", sans-serif';
+  ctx.fillText('Harmonie31 · ' + APP_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''), W / 2, H - 36);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) { showMessage('Görsel oluşturulamadı — bu tarayıcı desteklemiyor olabilir.'); return; }
+
+  const fileName = 'hatim-liste.png';
+  try {
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'Hatim Cüz Listesi',
+        text: (h.hatimName || 'Hatim') + ' için cüz dağılımı — kim ne almış, ne tamamlanmış 🌙\n' + APP_URL
       });
       return;
     }
@@ -1701,8 +1929,9 @@ async function buildAndShareProgressImage() {
 
 function shareOnWhatsApp() {
   const h = getSelectedHatim();
-  const takenCount = h.cuzler.filter(Boolean).length;
-  const completedCount = h.cuzler.filter((e) => e && e.completed).length;
+  const cuzOnly = h.cuzler.slice(0, CUZ_TOTAL);
+  const takenCount = cuzOnly.filter(Boolean).length;
+  const completedCount = cuzOnly.filter((e) => e && e.completed).length;
   const emptyNumbers = [];
   const helpNumbers = [];
   h.cuzler.forEach((entry, i) => {
@@ -1719,7 +1948,7 @@ function shareOnWhatsApp() {
   lines.push('*Son okuma tarihi:* ' + (h.targetDate || 'girilmedi'));
   lines.push('*KALAN SÜRE:* ' + getRemainingTimeCaps());
   lines.push('');
-  lines.push('*' + takenCount + ' / ' + TOTAL + '* alındı (30 cüz + hatim duası), *' + completedCount + '* tamamlandı.');
+  lines.push('*' + takenCount + ' / ' + CUZ_TOTAL + '* cüz alındı, *' + completedCount + '* tamamlandı.');
   lines.push('');
   if (emptyNumbers.length > 0) {
     lines.push('*Boş cüzler:* ' + emptyNumbers.join(', '));
